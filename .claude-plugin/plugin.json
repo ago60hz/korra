@@ -1,0 +1,9 @@
+{
+  "name": "korra",
+  "description": "Turn text or a logo into a lit 3D relic (rock, metal, glass, liquid) and export transparent PNGs or looping video.",
+  "version": "1.1.0",
+  "author": { "name": "ago60hz" },
+  "repository": "https://github.com/ago60hz/korra",
+  "license": "MIT",
+  "skills": "./skills/"
+}

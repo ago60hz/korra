@@ -1,0 +1,2253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Korra Material Forge</title>
+<meta name="description" content="Turn flat text into rock or metal relics, exported as transparent PNGs or looping video for Canva, sites and posters.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bagel+Fat+One&family=Cinzel+Decorative:wght@900&family=Fraunces:opsz,wght@9..144,900&family=Inter:wght@400;500;600&family=Playfair+Display:wght@900&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0c0e;
+    --panel: #141416;
+    --panel-2: #1b1b1e;
+    --line: #2a2a2f;
+    --text: #edebe7;
+    --muted: #a3a19c;
+    --accent: #e6a65d;
+    --accent-ink: #1c1206;
+    --focus: #f3c58f;
+    --danger: #ff8a7a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.4 Inter, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100dvh; }
+
+  /* Stage */
+  .stage { position: relative; overflow: hidden; background: #0a0a0b; outline: none; cursor: grab; touch-action: none;
+    display: grid; place-items: center; }
+  .stage.dragging { cursor: grabbing; }
+  .stage:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+  .stage.drop { box-shadow: inset 0 0 0 3px var(--accent); }
+  #gl { display: block; }
+  .stage.framed #gl { box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 20px 60px rgba(0,0,0,.5); }
+  .pill { position: absolute; top: 14px; left: 14px; padding: 6px 12px; border-radius: 99px;
+    background: rgba(12,12,14,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    font-size: 12px; font-weight: 500; color: var(--text); border: 1px solid rgba(255,255,255,.08); }
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; }
+  .overlay p { margin: 0; font-size: 15px; color: var(--text); text-shadow: 0 1px 12px rgba(0,0,0,.6);
+    background: rgba(12,12,14,.7); padding: 8px 14px; border-radius: 10px; }
+  .overlay.solid { background: var(--bg); pointer-events: auto; }
+  .overlay.solid p { background: none; }
+  .card { max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; text-align: left; }
+  .card h2 { margin: 0 0 8px; font-size: 16px; }
+  .card p { margin: 0 0 16px; color: var(--muted); text-shadow: none; font-size: 14px; background: none; padding: 0; }
+  .hint { position: absolute; left: 14px; bottom: 12px; margin: 0; font-size: 12px; color: rgba(255,255,255,.75);
+    text-shadow: 0 1px 8px rgba(0,0,0,.8); pointer-events: none; }
+  .toast { position: absolute; left: 50%; bottom: 18px; transform: translate(-50%, 12px); opacity: 0; max-width: calc(100% - 32px);
+    padding: 9px 14px; border-radius: 10px; background: rgba(20,20,22,.94); border: 1px solid var(--line);
+    font-size: 13px; transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { border-color: rgba(255,138,122,.5); color: var(--danger); }
+
+  /* Panel */
+  .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: baseline; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+  .logo { font: 900 22px/1 Fraunces, Georgia, serif; letter-spacing: .01em; }
+  .ver { font-size: 12px; color: var(--muted); }
+  section { padding: 16px 20px 6px; border-bottom: 1px solid var(--line); }
+  section h2 { margin: 0 0 12px; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .field { margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  label, .label { font-size: 13px; font-weight: 500; }
+  output { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .help { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .help.warn { color: var(--danger); }
+  textarea, select {
+    width: 100%; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px; min-height: 40px; margin-top: 6px; }
+  textarea { resize: vertical; min-height: 64px; font-size: 15px; }
+  .text-in { width: 100%; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px; min-height: 40px; margin-top: 6px; }
+  .text-in:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+  /* Font picker: a trigger showing the current face, opening a searchable listbox. */
+  .drop { display: grid; place-items: center; min-height: 120px; padding: 10px; border: 1px dashed #3a3a41; border-radius: 10px;
+    background: var(--panel-2); text-align: center; cursor: pointer; }
+  .drop:hover, .drop.over { border-color: var(--accent); }
+  .drop:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .drop p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .drop p strong { color: var(--text); font-weight: 500; }
+  .drop canvas { width: 100%; height: auto; border-radius: 6px; background: #fff; }
+  .bg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .font-field { position: relative; }
+  .font-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px;
+    margin-top: 6px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--text); cursor: pointer; text-align: left; }
+  .font-trigger:hover { border-color: #3d3d44; }
+  .font-trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .font-trigger[aria-expanded=true] svg { transform: rotate(180deg); }
+  .font-current { font-size: 18px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .combo { position: relative; margin-top: 6px; }
+  .combo-input { margin: 0; padding-right: 40px; font-size: 17px; min-height: 44px; }
+  .combo-input.closed { cursor: pointer; }
+  .combo-btn { position: absolute; top: 4px; right: 4px; bottom: 4px; width: 34px; display: grid; place-items: center;
+    border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .combo-btn:hover { color: var(--text); background: rgba(255,255,255,.05); }
+  .combo[data-open] .combo-btn svg { transform: rotate(180deg); }
+  .font-pop { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; padding: 6px;
+    background: #1d1d21; border: 1px solid rgba(255,255,255,.1); border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(8,8,10,.4), 0 8px 24px rgba(8,8,10,.45), 0 24px 48px rgba(8,8,10,.35); }
+  .font-search { margin: 0 0 6px; }
+  .font-list { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; }
+  .font-group { padding: 10px 10px 4px; font: 600 11px/1 Inter, system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .font-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 0 10px;
+    border-radius: 6px; font-size: 17px; cursor: pointer; white-space: nowrap; }
+  .font-opt span { overflow: hidden; text-overflow: ellipsis; }
+  .font-opt.active { background: #2b2b31; }
+  .font-opt[aria-selected=true]::after { content: "✓"; font: 500 13px Inter, system-ui, sans-serif; color: var(--accent); }
+  .font-opt.action { font: 500 13px Inter, system-ui, sans-serif; color: var(--accent); }
+  .font-opt.missing { opacity: .45; }
+  .font-note { padding: 8px 10px 10px; font-size: 12px; color: var(--muted); }
+  .font-foot { margin: 6px 4px 0; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
+  .font-foot:empty { display: none; }
+  .font-foot.warn { color: var(--danger); }
+  textarea:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); height: 22px; }
+  input[type=range]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Segmented / chips */
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .seg label { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 8px;
+    background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; font-size: 13px; user-select: none; }
+  .seg label:hover { border-color: #3d3d44; }
+  .seg input:checked + label { background: var(--text); color: #111; border-color: var(--text); }
+  .seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .seg input:disabled + label { opacity: .45; cursor: not-allowed; }
+  .soon { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+  .swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+  .swatches input[type=radio] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .swatches label.sw { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); position: relative; }
+  .swatches label.sw::after { content: ""; position: absolute; inset: -6px; }
+  .swatches input:checked + label.sw { border-color: var(--text); }
+  .swatches input:focus-visible + label.sw { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .swName { margin: 6px 0 0; font-size: 12px; color: var(--muted); min-height: 16px; }
+  .custom { display: inline-flex; align-items: center; gap: 8px; margin-left: 4px; font-size: 12px; color: var(--muted); }
+  input[type=color] { width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: none; cursor: pointer; }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type=color]::-webkit-color-swatch { border: none; border-radius: 50%; }
+  input[type=color]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .check { display: flex; align-items: center; gap: 10px; min-height: 36px; margin-bottom: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    font: 500 13px Inter, system-ui, sans-serif; cursor: pointer; }
+  .btn:hover { border-color: #44444b; }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn[aria-busy=true] { cursor: progress; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; font-size: 14px; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+
+  .panel-foot { position: sticky; bottom: 0; margin-top: auto; padding: 14px 20px 16px; background: var(--panel); border-top: 1px solid var(--line); }
+  .foot-btns { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; }
+  .foot-btns .btn { min-height: 46px; }
+
+  @media (max-width: 820px) {
+    html, body { height: auto; }
+    .app { grid-template-columns: 1fr; grid-template-rows: 62vh auto; height: auto; }
+    .stage { position: sticky; top: 0; z-index: 2; }
+    .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+    section, .brand, .panel-foot { padding-left: 16px; padding-right: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<main class="app">
+  <div class="stage" id="stage" tabindex="0" aria-label="Preview. Drag, or use the arrow keys, to pose the piece.">
+    <canvas id="gl"></canvas>
+    <div class="pill" id="status" role="status" aria-live="polite" hidden>Carving…</div>
+    <div class="overlay" id="empty" hidden><p>Type a word to cast it.</p></div>
+    <div class="overlay solid" id="boot"><p>Loading the 3D engine…</p></div>
+    <div class="overlay solid" id="fatal" hidden>
+      <div class="card" role="alert">
+        <h2>Korra couldn't start</h2>
+        <p id="fatalMsg"></p>
+        <button class="btn" type="button" id="retry">Try again</button>
+      </div>
+    </div>
+    <p class="hint" id="hint">Drag to move · Shift-drag to turn · Scroll to resize · Drop a design to test on it</p>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <aside class="panel" aria-label="Controls">
+    <header class="brand"><span class="logo">Korra</span><span class="ver">Material forge · v1.1</span></header>
+
+    <section aria-labelledby="h-source">
+      <h2 id="h-source">Source</h2>
+      <div class="field">
+        <div class="seg" role="radiogroup" aria-label="Source" id="srcSeg">
+          <input type="radio" name="src" id="src-text" value="text" checked><label for="src-text">Text</label>
+          <input type="radio" name="src" id="src-image" value="image"><label for="src-image">SVG or PNG</label>
+        </div>
+      </div>
+      <div id="imageSource" hidden>
+        <div class="drop" id="srcDrop" tabindex="0" role="button" aria-describedby="srcDropHelp">
+          <canvas id="maskPreview" width="592" height="320" hidden aria-label="Black and white form Korra will cast"></canvas>
+          <p id="srcDropText"><strong>Choose an SVG or PNG</strong><br>or drop it here</p>
+        </div>
+        <input type="file" id="srcFile" accept="image/svg+xml,.svg,image/png,image/webp,image/jpeg" class="sr" tabindex="-1" aria-hidden="true">
+        <p class="help" id="srcDropHelp">Korra reduces it to black and white: black becomes the form, white the empty space.</p>
+        <p class="help warn" id="srcWarn" hidden></p>
+        <div data-sliders="image" style="margin-top:12px"></div>
+        <label class="check"><input type="checkbox" id="srcInvert"> Invert form and space</label>
+      </div>
+      <div id="textSource">
+      <div class="field">
+        <label for="text">Text</label>
+        <textarea id="text" rows="2" maxlength="40" spellcheck="false">Korra</textarea>
+        <p class="help">Short words look best. Press Enter for a new line.</p>
+      </div>
+      <div class="field font-field" id="fontField">
+        <label class="label" for="fontInput">Font</label>
+        <div class="combo">
+          <input class="text-in combo-input" id="fontInput" role="combobox" aria-expanded="false" aria-controls="fontList"
+            aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search fonts">
+          <button type="button" class="combo-btn" id="fontBtn" tabindex="-1" aria-label="Show all fonts">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="font-pop" id="fontPop" hidden>
+            <div class="font-list" id="fontList" role="listbox" aria-label="Fonts"></div>
+            <p class="font-foot" id="fontFoot" aria-live="polite"></p>
+          </div>
+        </div>
+        <p class="help warn" id="fontWarn" hidden></p>
+      </div>
+      <div data-sliders="source"></div>
+      <p class="help" id="leadHelp" style="margin:-8px 0 14px">Leading applies once there’s a second line.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-mat">
+      <h2 id="h-mat">Material</h2>
+      <div class="field">
+        <div class="seg" role="radiogroup" aria-label="Material" id="matSeg"></div>
+        <p class="help">Glass refracts whatever is behind it, so try it over your design. Dither and ASCII come next.</p>
+      </div>
+      <div class="field">
+        <span class="label" id="swLabel">Finish</span>
+        <div class="swatches" role="radiogroup" aria-labelledby="swLabel" id="swatches"></div>
+        <p class="swName" id="swName" aria-hidden="true"></p>
+      </div>
+      <div data-sliders="mat"></div>
+    </section>
+
+    <section aria-labelledby="h-shape">
+      <h2 id="h-shape">Shape</h2>
+      <div data-sliders="shape"></div>
+    </section>
+
+    <section aria-labelledby="h-light">
+      <h2 id="h-light">Light</h2>
+      <div data-sliders="light"></div>
+      <label class="check"><input type="checkbox" id="studio" checked> Studio reflections on metal</label>
+    </section>
+
+    <section aria-labelledby="h-scene">
+      <h2 id="h-scene">Scene</h2>
+      <div class="field">
+        <span class="label" id="bgLabel">Background</span>
+        <div class="bg-row" style="margin-top:8px">
+          <div class="seg" role="radiogroup" aria-labelledby="bgLabel" id="bgSeg"></div>
+          <label class="custom">Colour <input type="color" id="bgColor" value="#f3f2ef" aria-label="Background colour"></label>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" type="button" id="uploadBtn">Upload design</button>
+        <input type="file" id="file" accept="image/*" class="sr" tabindex="-1" aria-hidden="true">
+      </div>
+      <p class="help" style="margin:-8px 0 12px">Test the piece on your poster or photo. It also lights the piece.</p>
+      <p class="help warn" id="bgWarn" hidden style="margin:-6px 0 12px"></p>
+      <label class="check"><input type="checkbox" id="backdrop"> Cast shadow on backdrop</label>
+    </section>
+
+    <section aria-labelledby="h-frame">
+      <h2 id="h-frame">Frame</h2>
+      <div class="field">
+        <div class="seg" role="radiogroup" aria-label="Frame shape" id="frameSeg"></div>
+        <p class="help" id="frameHelp">The shape of the scene PNG and video export.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-place">
+      <h2 id="h-place">Placement</h2>
+      <div class="field">
+        <span class="label" id="dragLabel">Drag on the preview to</span>
+        <div class="seg" role="radiogroup" aria-labelledby="dragLabel" id="dragSeg" style="margin-top:8px">
+          <input type="radio" name="drag" id="drag-move" value="move" checked><label for="drag-move">Move</label>
+          <input type="radio" name="drag" id="drag-turn" value="turn"><label for="drag-turn">Turn</label>
+        </div>
+        <p class="help">Hold Shift to do the other. Scroll on the preview to resize. Arrow keys nudge.</p>
+      </div>
+      <div data-sliders="place"></div>
+      <div class="btn-row"><button class="btn" type="button" id="centerBtn">Centre the piece</button></div>
+    </section>
+
+    <section aria-labelledby="h-motion">
+      <h2 id="h-motion">Motion</h2>
+      <div class="btn-row"><button class="btn" type="button" id="turnBtn" aria-pressed="true">Pause preview</button></div>
+      <div data-sliders="motion"></div>
+      <p class="help" style="margin:-6px 0 14px">Video exports one seamless loop of this motion.</p>
+    </section>
+
+    <section aria-labelledby="h-export">
+      <h2 id="h-export">Export</h2>
+      <div class="field">
+        <span class="label" id="exBgLabel">Background</span>
+        <div class="seg" role="radiogroup" aria-labelledby="exBgLabel" id="exBgSeg" style="margin-top:8px">
+          <input type="radio" name="exbg" id="exbg-transparent" value="transparent" checked><label for="exbg-transparent">Transparent</label>
+          <input type="radio" name="exbg" id="exbg-scene" value="scene"><label for="exbg-scene">With scene</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label" id="exSizeLabel">Size</span>
+        <div class="seg" role="radiogroup" aria-labelledby="exSizeLabel" id="exSizeSeg" style="margin-top:8px">
+          <input type="radio" name="exsize" id="exsize-2048" value="2048" checked><label for="exsize-2048">2K</label>
+          <input type="radio" name="exsize" id="exsize-4096" value="4096"><label for="exsize-4096">4K</label>
+        </div>
+      </div>
+      <p class="help" id="exportHelp" style="margin:-6px 0 14px"></p>
+    </section>
+
+    <footer class="panel-foot">
+      <div class="foot-btns">
+        <button class="btn primary" type="button" id="exportBtn">Export PNG</button>
+        <button class="btn" type="button" id="videoBtn">Export video</button>
+      </div>
+    </footer>
+  </aside>
+</main>
+
+<script type="module">
+/* ---------- Small helpers ---------- */
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// 2D simplex noise, seeded. Returns roughly [-1, 1].
+function makeSimplex(seed) {
+  const r = mulberry32(seed);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const j = (r() * (i + 1)) | 0; const t = p[i]; p[i] = p[j]; p[j] = t; }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  const GX = [1, -1, 1, -1, 1, -1, 0, 0], GY = [1, 1, -1, -1, 0, 0, 1, -1];
+  const F2 = 0.5 * (Math.sqrt(3) - 1), G2 = (3 - Math.sqrt(3)) / 6;
+  return function (xin, yin) {
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s), j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const x0 = xin - (i - t), y0 = yin - (j - t);
+    const i1 = x0 > y0 ? 1 : 0, j1 = 1 - i1;
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255, jj = j & 255;
+    let n = 0, tt, g;
+    tt = 0.5 - x0 * x0 - y0 * y0;
+    if (tt > 0) { g = perm[ii + perm[jj]] & 7; tt *= tt; n += tt * tt * (GX[g] * x0 + GY[g] * y0); }
+    tt = 0.5 - x1 * x1 - y1 * y1;
+    if (tt > 0) { g = perm[ii + i1 + perm[jj + j1]] & 7; tt *= tt; n += tt * tt * (GX[g] * x1 + GY[g] * y1); }
+    tt = 0.5 - x2 * x2 - y2 * y2;
+    if (tt > 0) { g = perm[ii + 1 + perm[jj + 1]] & 7; tt *= tt; n += tt * tt * (GX[g] * x2 + GY[g] * y2); }
+    return 70 * n;
+  };
+}
+function fbm(n, x, y, oct) {
+  let s = 0, a = 0.5, f = 1, norm = 0;
+  for (let o = 0; o < oct; o++) { s += a * n(x * f, y * f); norm += a; a *= 0.5; f *= 2.03; }
+  return s / norm;
+}
+
+// Felzenszwalb & Huttenlocher squared Euclidean distance transform.
+function edt1d(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; const dq = q - v[k]; d[q] = dq * dq + f[v[k]]; }
+}
+function edt2d(grid, w, h) {
+  const n = Math.max(w, h);
+  const f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) f[y] = grid[y * w + x];
+    edt1d(f, h, d, v, z);
+    for (let y = 0; y < h; y++) grid[y * w + x] = d[y];
+  }
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) f[x] = grid[row + x];
+    edt1d(f, w, d, v, z);
+    for (let x = 0; x < w; x++) grid[row + x] = d[x];
+  }
+}
+function boxBlur(src, dst, tmp, w, h, r) {
+  const inv = 1 / (2 * r + 1);
+  for (let y = 0; y < h; y++) {
+    const row = y * w; let acc = 0;
+    for (let x = -r; x <= r; x++) acc += src[row + clamp(x, 0, w - 1)];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc * inv;
+      acc += src[row + Math.min(w - 1, x + r + 1)] - src[row + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[clamp(y, 0, h - 1) * w + x];
+    for (let y = 0; y < h; y++) {
+      dst[y * w + x] = acc * inv;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+}
+
+/* ---------- State ---------- */
+const FONTS = {
+  'Fraunces': 900, 'Cinzel Decorative': 900, 'Playfair Display': 900, 'Archivo Black': 400,
+  'Bagel Fat One': 400, 'UnifrakturMaguntia': 400, 'Georgia': 700,
+};
+const fontStr = (fam, px) => `${FONTS[fam]} ${px}px "${fam}", Georgia, serif`;
+
+// Metal colours are measured F0 reflectance (linear) converted to sRGB, so each metal
+// tints its reflections the way the real one does. Rock colours are plain albedo.
+const FINISHES = {
+  rock: [
+    { name: 'Sandstone', color: '#c4a08c' }, { name: 'Limestone', color: '#cfc2ad' },
+    { name: 'Basalt', color: '#5a5450' }, { name: 'Terracotta', color: '#a65d3c' },
+  ],
+  metal: [
+    { name: 'Chrome', color: '#c4c5c5', rough: 0.04, corrode: 0, patina: null },
+    { name: 'Silver', color: '#fcfaf5', rough: 0.1, corrode: 0, patina: null },
+    // Old, handled silver: pitted and oxidised, dark in the lows, rubbed bright on the highs.
+    { name: 'Ancient silver', color: '#cfcecb', rough: 0.55, corrode: 0.85, wear: 0.8, patina: null },
+    // Cast bronze: warm metal where it's handled, verdigris collecting in the pits and patches.
+    { name: 'Bronze', color: '#d39b63', rough: 0.3, corrode: 0.5, wear: 0.65, patina: '#4f9a85' },
+    { name: 'Gunmetal', color: '#6f7277', rough: 0.22, corrode: 0, patina: null },
+  ],
+  // Glass: the colour is what the glass absorbs through its depth; atten is how fast (smaller = denser tint).
+  glass: [
+    { name: 'Clear', color: '#eef6f8', rough: 0.02, atten: 3 },
+    { name: 'Frosted', color: '#eef3f5', rough: 0.32, atten: 3 },
+    { name: 'Smoke', color: '#5d6066', rough: 0.03, atten: 0.45 },
+    { name: 'Bottle green', color: '#3e8f58', rough: 0.03, atten: 0.4 },
+    { name: 'Amber', color: '#d98a2b', rough: 0.03, atten: 0.5 },
+  ],
+  // Liquids: the colour tints the liquid itself (absorption for the clear ones).
+  liquid: [
+    { name: 'Mercury', color: '#d3d6da', rough: 0.03, kind: 'mercury' },
+    { name: 'Water', color: '#cfeaff', rough: 0.02, kind: 'water' },
+    { name: 'Honey', color: '#ffb23f', rough: 0.04, kind: 'honey' },
+    { name: 'Ink', color: '#101014', rough: 0.06, kind: 'ink' },
+  ],
+};
+const LIQUIDS = {
+  mercury: { metalness: 1, transmission: 0, ior: 1.5, clearcoat: 0 },
+  water: { metalness: 0, transmission: 1, ior: 1.33, clearcoat: 0, atten: 1.2, dispersion: 0.35, env: 1.8 },
+  honey: { metalness: 0, transmission: 0.97, ior: 1.49, clearcoat: 0, atten: 0.7, dispersion: 0.15, env: 1.5 },
+  ink: { metalness: 0, transmission: 0, ior: 1.5, clearcoat: 1 },
+};
+const BACKGROUNDS = [['white', 'White', '#f3f2ef'], ['black', 'Black', '#060606']];
+const FRAMES = [['fit', 'Fit window'], ['1:1', '1:1'], ['4:5', '4:5'], ['9:16', '9:16'], ['16:9', '16:9'], ['design', 'Design']];
+
+const state = {
+  source: 'text', threshold: 0.5, cleanup: 0.2, invert: false,
+  text: 'Korra', font: 'Fraunces', tracking: 0, leading: 1.05, material: 'rock',
+  rock: { color: '#c4a08c', rough: 0.92, detail: 0.6, wear: 0.3 },
+  metal: { color: '#c4c5c5', rough: 0.04, wear: 0.4, dust: 0.12, corrode: 0, patina: null },
+  glass: { color: '#eef6f8', rough: 0.02, atten: 3 },
+  liquid: { color: '#d3d6da', rough: 0.03, kind: 'mercury', melt: 0.35, flow: 0.4 },
+  puff: 0.55, thickness: 0.45,
+  keyAz: -48, keyEl: 26, keyPow: 2.6, keyK: 4800, rim: 1.6, ambient: 1.0, studio: true,
+  bg: 'white', bgColor: '#f3f2ef', backdrop: false,
+  frame: 'fit', posX: 0, posY: 0, size: 1, dragMode: 'move',
+  turn: false, turnAmt: 30, tiltAmt: 6, loop: 6,
+  exportBg: 'transparent', exportSize: 2048,
+};
+
+const pct = (v) => `${Math.round(v * 100)}%`;
+const deg = (v) => `${Math.round(v)}°`;
+const SLIDERS = [
+  { id: 'threshold', sec: 'image', label: 'Threshold', min: 0.02, max: 0.98, step: 0.01, fmt: pct, on: 'rebuild' },
+  { id: 'cleanup', sec: 'image', label: 'Clean up', min: 0, max: 1, step: 0.01, fmt: pct, on: 'rebuild' },
+  { id: 'tracking', sec: 'source', label: 'Tracking', min: -0.15, max: 0.6, step: 0.005, fmt: (v) => `${Math.round(v * 1000)}`, on: 'rebuild' },
+  { id: 'leading', sec: 'source', label: 'Leading', min: 0.6, max: 1.8, step: 0.01, fmt: (v) => `${v.toFixed(2)}×`, on: 'rebuild' },
+  { id: 'detail', sec: 'mat', label: 'Surface detail', min: 0, max: 1, step: 0.01, fmt: pct, only: 'rock',
+    get: () => state.rock.detail, set: (v) => state.rock.detail = v, on: 'compose' },
+  { id: 'wear', sec: 'mat', label: 'Edge wear', min: 0, max: 1, step: 0.01, fmt: pct, only: 'rock',
+    get: () => state.rock.wear, set: (v) => state.rock.wear = v, on: 'compose' },
+  { id: 'mwear', sec: 'mat', label: 'Wear', min: 0, max: 1, step: 0.01, fmt: pct, only: 'metal',
+    get: () => state.metal.wear, set: (v) => state.metal.wear = v, on: 'compose' },
+  { id: 'corrode', sec: 'mat', label: 'Corrosion', min: 0, max: 1, step: 0.01, fmt: pct, only: 'metal',
+    get: () => state.metal.corrode, set: (v) => state.metal.corrode = v, on: 'compose' },
+  { id: 'dust', sec: 'mat', label: 'Dust', min: 0, max: 1, step: 0.01, fmt: pct, only: 'metal',
+    get: () => state.metal.dust, set: (v) => state.metal.dust = v, on: 'compose' },
+  { id: 'melt', sec: 'mat', label: 'Melt', min: 0, max: 1, step: 0.01, fmt: pct, only: 'liquid',
+    get: () => state.liquid.melt, set: (v) => state.liquid.melt = v, on: 'compose' },
+  { id: 'flow', sec: 'mat', label: 'Flow', min: 0, max: 1, step: 0.01, fmt: pct, only: 'liquid',
+    get: () => state.liquid.flow, set: (v) => state.liquid.flow = v },
+  { id: 'rough', sec: 'mat', label: 'Roughness', min: 0.02, max: 1, step: 0.01, fmt: pct,
+    get: () => state[state.material].rough, set: (v) => state[state.material].rough = v, on: 'roughness' },
+  { id: 'puff', sec: 'shape', label: 'Bevel', min: 0, max: 1, step: 0.01, fmt: pct, on: 'compose' },
+  { id: 'thickness', sec: 'shape', label: 'Thickness', min: 0, max: 1, step: 0.01, fmt: pct, on: 'compose' },
+  { id: 'keyAz', sec: 'light', label: 'Light direction', min: -180, max: 180, step: 1, fmt: deg, on: 'light' },
+  { id: 'keyEl', sec: 'light', label: 'Light height', min: 2, max: 85, step: 1, fmt: deg, on: 'light' },
+  { id: 'keyPow', sec: 'light', label: 'Light strength', min: 0, max: 8, step: 0.1, fmt: (v) => v.toFixed(1), on: 'light' },
+  { id: 'keyK', sec: 'light', label: 'Light colour', min: 2000, max: 9000, step: 100, fmt: (v) => `${v}K${v < 4500 ? ' · warm' : v > 6500 ? ' · cool' : ''}`, on: 'light' },
+  { id: 'rim', sec: 'light', label: 'Rim light', min: 0, max: 6, step: 0.1, fmt: (v) => v.toFixed(1), on: 'light' },
+  { id: 'ambient', sec: 'light', label: 'Light from scene', min: 0, max: 2, step: 0.01, fmt: pct, on: 'material' },
+  { id: 'size', sec: 'place', label: 'Size', min: 0.2, max: 2.5, step: 0.01, fmt: pct },
+  { id: 'turnAmt', sec: 'motion', label: 'Turn', min: 0, max: 60, step: 1, fmt: deg },
+  { id: 'tiltAmt', sec: 'motion', label: 'Tilt', min: 0, max: 25, step: 1, fmt: deg },
+  { id: 'loop', sec: 'motion', label: 'Loop length', min: 2, max: 12, step: 0.5, fmt: (v) => `${v}s` },
+];
+for (const s of SLIDERS) {
+  if (!s.get) { s.get = () => state[s.id]; s.set = (v) => state[s.id] = v; }
+}
+
+/* ---------- UI feedback ---------- */
+let toastTimer;
+function toast(msg, isError = false) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('error', isError); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 4200 : 2800);
+}
+function fatal(msg) {
+  $('#boot').hidden = true; $('#fatalMsg').textContent = msg; $('#fatal').hidden = false;
+}
+$('#retry').addEventListener('click', () => location.reload());
+let busyCount = 0;
+function setBusy(on, label = 'Carving…') {
+  busyCount += on ? 1 : -1;
+  const s = $('#status'); s.textContent = label; s.hidden = busyCount <= 0;
+}
+const nextPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+/* ---------- Boot ---------- */
+let THREE;
+try {
+  THREE = await import('three');
+} catch (e) {
+  console.error(e);
+  fatal('The 3D engine (Three.js) didn’t load. Korra needs an internet connection to fetch it. Check your connection and try again.');
+  throw e;
+}
+
+/* ---------- Renderer & scene ---------- */
+const stage = $('#stage');
+const canvas = $('#gl');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+  if (!renderer.capabilities.isWebGL2) throw new Error('WebGL2 required');
+} catch (e) {
+  fatal('Your browser couldn’t start WebGL 2, which Korra needs. Try a recent Chrome, Edge, Safari or Firefox.');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
+const group = new THREE.Group();
+scene.add(group);
+
+const key = new THREE.DirectionalLight(0xffffff, 3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.015;
+scene.add(key);
+scene.add(key.target);
+const rim = new THREE.DirectionalLight(0xffffff, 1.5);
+scene.add(rim);
+
+const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.38 }));
+backdrop.position.z = -0.9;
+backdrop.receiveShadow = true;
+backdrop.visible = false;
+scene.add(backdrop);
+
+const W = 4; // world width of the piece
+let shadowBase = 2;
+const thicknessWorld = () => 0.06 + state.thickness * 0.5;
+const BACK_RATIO = 0.4;
+
+// Normals are baked in object space. Tangent-space maps would take their frame from the displaced,
+// faceted grid, and chrome would mirror every facet as a stripe.
+const matFront = new THREE.MeshPhysicalMaterial({ alphaTest: 0.5, alphaToCoverage: true, normalMapType: THREE.ObjectSpaceNormalMap });
+// Flow: liquid surfaces ripple. Two noise layers drift round opposite circles, so the motion repeats
+// exactly once per loop (and a video export loops seamlessly). Height moves the vertices; the same
+// field bumps the normals so the ripples show in reflections and refraction.
+const LIQ_U = { uFlow: { value: 0 }, uPhase: { value: 0 } };
+const LIQ_NOISE = `
+  float lHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float lNoise(vec3 x) {
+    vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(lHash(i), lHash(i + vec3(1,0,0)), f.x), mix(lHash(i + vec3(0,1,0)), lHash(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(lHash(i + vec3(0,0,1)), lHash(i + vec3(1,0,1)), f.x), mix(lHash(i + vec3(0,1,1)), lHash(i + vec3(1,1,1)), f.x), f.y), f.z) * 2.0 - 1.0;
+  }
+  float lWave(vec2 q, float ph) {
+    vec2 a = vec2(cos(ph), sin(ph)), b = vec2(cos(-ph * 2.0), sin(-ph * 2.0));
+    return 0.65 * lNoise(vec3(q * 1.5 + a * 0.9, 0.3)) + 0.35 * lNoise(vec3(q * 3.4 + b * 0.6, 4.1));
+  }`;
+function liquidShader(sh) {
+  Object.assign(sh.uniforms, LIQ_U);
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', `#include <common>
+      uniform float uFlow, uPhase; varying float vKH; varying vec2 vKQ;${LIQ_NOISE}`)
+    .replace('#include <displacementmap_vertex>', `#include <displacementmap_vertex>
+      #ifdef USE_DISPLACEMENTMAP
+        vKH = texture2D(displacementMap, vDisplacementMapUv).x;
+      #else
+        vKH = 0.0;
+      #endif
+      vKQ = position.xy;
+      if (uFlow > 0.0) transformed.z += uFlow * 0.06 * lWave(vKQ, uPhase) * smoothstep(0.0, 0.3, vKH);`);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+      uniform float uFlow, uPhase; varying float vKH; varying vec2 vKQ;${LIQ_NOISE}`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (uFlow > 0.0) {
+        float hgt = uFlow * (0.06 * lWave(vKQ, uPhase) + 0.006 * lNoise(vec3(vKQ * 14.0, uPhase))) * smoothstep(0.0, 0.3, vKH);
+        vec3 sp = -vViewPosition, dpx = dFdx(sp), dpy = dFdy(sp);
+        vec2 dH = vec2(dFdx(hgt) / max(length(dpx), 1e-6), dFdy(hgt) / max(length(dpy), 1e-6));
+        vec3 sx = normalize(dpx), sy = normalize(dpy), r1 = cross(sy, normal), r2 = cross(normal, sx);
+        float det = dot(sx, r1);
+        normal = normalize(abs(det) * normal - sign(det) * (dH.x * r1 + dH.y * r2));
+      }`);
+}
+matFront.onBeforeCompile = liquidShader;
+const front = new THREE.Mesh(new THREE.BufferGeometry(), matFront);
+// The back is the same surface mirrored and squashed in z; the normal matrix of that scale
+// turns the front's normals into correct back-facing ones, and three.js flips the winding.
+// Its cutout reaches a hair past the front's soft edge so the seam between them never shows through.
+const matBack = new THREE.MeshPhysicalMaterial();
+const back = new THREE.Mesh(front.geometry, matBack);
+back.scale.z = -BACK_RATIO;
+function syncBack() {
+  matBack.copy(matFront);
+  matBack.alphaTest = 0.12;
+  matBack.alphaToCoverage = false;
+  matBack.side = THREE.DoubleSide; // its rim ring faces away from camera but must still fill the seam
+  matBack.needsUpdate = true;
+  const m = state[state.material];
+  const metal = state.material === 'metal';
+  matBack.onBeforeCompile = matFront.onBeforeCompile;
+  const glassW = state.material === 'glass';
+  matWall.color.set(glassW ? '#ffffff' : m.color);
+  for (const k of ['transmission', 'ior', 'thickness', 'attenuationDistance', 'dispersion']) matWall[k] = matFront[k];
+  matWall.attenuationColor.copy(matFront.attenuationColor);
+  matWall.metalness = matFront.metalness;
+  matWall.roughness = clamp(m.rough + (metal ? m.wear * 0.05 : 0), 0.02, 1);
+  if (glassW && (matWall.transmission > 0) !== matWall.userData.clear) { matWall.userData.clear = true; matWall.needsUpdate = true; }
+  WALL_U.uCorr.value = metal ? m.corrode : 0;
+  WALL_U.uWear.value = metal ? m.wear : 0;
+  WALL_U.uDust.value = metal ? m.dust : 0;
+  WALL_U.uHasPatina.value = metal && m.patina ? 1 : 0;
+  if (metal && m.patina) WALL_U.uPatina.value.set(m.patina);
+  matWall.envMapIntensity = matFront.envMapIntensity;
+  if (matWall.envMap !== matFront.envMap) { matWall.envMap = matFront.envMap; matWall.needsUpdate = true; }
+}
+// The walls have no UVs (marching-squares segments come unordered), so their corrosion, wear and
+// dust are procedural 3D noise on object-space position, at the same scales as the baked face maps.
+const WALL_U = { uCorr: { value: 0 }, uWear: { value: 0 }, uDust: { value: 0 }, uPatina: { value: new THREE.Color() }, uHasPatina: { value: 0 } };
+const matWall = new THREE.MeshPhysicalMaterial();
+matWall.onBeforeCompile = (sh) => {
+  Object.assign(sh.uniforms, WALL_U);
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vObjPos;\nvarying vec3 vObjNormal;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjPos = position; vObjNormal = normal;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vObjPos; varying vec3 vObjNormal;
+      uniform float uCorr, uWear, uDust, uHasPatina; uniform vec3 uPatina;
+      float kHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float kNoise(vec3 x) {
+        vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(kHash(i), kHash(i + vec3(1,0,0)), f.x), mix(kHash(i + vec3(0,1,0)), kHash(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(kHash(i + vec3(0,0,1)), kHash(i + vec3(1,0,1)), f.x), mix(kHash(i + vec3(0,1,1)), kHash(i + vec3(1,1,1)), f.x), f.y), f.z) * 2.0 - 1.0;
+      }
+      float kFbm(vec3 p) { return 0.5 * kNoise(p) + 0.25 * kNoise(p * 2.03) + 0.125 * kNoise(p * 4.1); }`)
+    .replace('#include <map_fragment>', `#include <map_fragment>
+      // Same feature sizes as the face: fine grain ~0.02, medium ~0.1, blotches ~0.5 world units.
+      float kFine = kFbm(vObjPos * 52.0), kMed = kFbm(vObjPos * 9.0 + 3.1), kCoarse = kFbm(vObjPos * 2.1 + 7.7);
+      float kPit = uCorr * smoothstep(0.18, 0.5, kFbm(vObjPos * 24.0 + 1.3));
+      float kBlotch = uCorr * clamp(-kCoarse * 1.6, 0.0, 1.0) * 0.55;
+      float kTarn = uWear * clamp(-kMed * 1.2, 0.0, 1.0) * 0.35;
+      float kDust = uDust * smoothstep(0.15, 0.7, vObjNormal.y) * clamp(kCoarse * 1.5 + 0.6, 0.0, 1.0);
+      // Walls are the sheltered sides: never rubbed bright, so they carry more of the age than the faces.
+      diffuseColor.rgb *= (1.0 - kBlotch) * (1.0 - kPit * 0.5) * (1.0 - kTarn) * (1.0 - uCorr * 0.3) * (1.0 + kFine * uCorr * 0.25)
+        * (1.0 - uWear * 0.25);
+      // Bronze's sheltered sides oxidise to a brown film rather than staying bare metal.
+      diffuseColor.rgb *= mix(vec3(1.0), vec3(0.58, 0.45, 0.34), uHasPatina * clamp(uCorr * 1.6, 0.0, 1.0));
+      float kPv = uHasPatina * clamp((kPit * 1.4 + kBlotch * 2.4 + uCorr * 0.3 * (kMed * 0.5 + 0.5)) * 1.7, 0.0, 1.0); // walls get more: they're the sheltered sides
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPatina * (0.8 + 0.4 * (kMed * 0.5 + 0.5)), kPv);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.5, 0.43), kDust);`)
+    .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      roughnessFactor = clamp(roughnessFactor + uCorr * (0.12 + 0.3 * kPit + 0.4 * kBlotch) + kTarn * 0.5 + uWear * 0.1 + uHasPatina * uCorr * 0.25, 0.02, 1.0);
+      roughnessFactor = mix(roughnessFactor, 0.85, kPv);
+      roughnessFactor = mix(roughnessFactor, 0.92, kDust);`)
+    .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+      metalnessFactor *= (1.0 - uCorr * 0.25) * (1.0 - kPit * 0.6) * (1.0 - kDust) * (1.0 - kPv); // oxide and patina aren't metal`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        // Bump from the corrosion height, in world-scale slope, via screen-space derivatives.
+        float hgt = uCorr * (kFine * 0.0024 + kMed * 0.0022 + kCoarse * 0.0025 - kPit * 0.001)
+                  + uWear * kMed * 0.0004;
+        vec3 sp = -vViewPosition;
+        vec3 dpx = dFdx(sp), dpy = dFdy(sp);
+        vec2 dH = vec2(dFdx(hgt) / max(length(dpx), 1e-6), dFdy(hgt) / max(length(dpy), 1e-6));
+        vec3 sx = normalize(dpx), sy = normalize(dpy);
+        vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
+        float det = dot(sx, r1);
+        normal = normalize(abs(det) * normal - sign(det) * (dH.x * r1 + dH.y * r2));
+      }`);
+};
+const walls = new THREE.Mesh(new THREE.BufferGeometry(), matWall);
+walls.visible = false;
+for (const m of [front, back, walls]) { m.castShadow = true; m.receiveShadow = true; group.add(m); }
+
+/* ---------- Text → signed distance field ---------- */
+const TW = 1280;
+let field = null;
+const DITHER = (() => { const r = mulberry32(99), a = new Float32Array(4096); for (let i = 0; i < 4096; i++) a[i] = r() - 0.5; return a; })();
+
+function drawMask(text, fam) {
+  const lines = text.split('\n').map((s) => s.trim()).filter(Boolean);
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  const base = 200;
+  ctx.font = fontStr(fam, base);
+  // Tracking is in thousandths of an em, like a type tool; kerning comes from measuring prefixes.
+  const lineWidth = (l, m, ts) => m.actualBoundingBoxLeft + m.actualBoundingBoxRight + ts * (Array.from(l).length - 1);
+  let maxW = 0, asc = 0, desc = 0;
+  for (const l of lines) {
+    const m = ctx.measureText(l);
+    maxW = Math.max(maxW, lineWidth(l, m, state.tracking * base));
+    asc = Math.max(asc, m.actualBoundingBoxAscent); desc = Math.max(desc, m.actualBoundingBoxDescent);
+  }
+  const lineH = (asc + desc) * state.leading;
+  const contentH = lineH * (lines.length - 1) + asc + desc;
+  const pad = TW * 0.07;
+  let scale = (TW - 2 * pad) / Math.max(1, maxW);
+  let TH = Math.round(contentH * scale + 2 * pad);
+  const maxTH = Math.round(TW * 1.1);
+  if (TH > maxTH) { scale = (maxTH - 2 * pad) / contentH; TH = maxTH; }
+  TH = Math.max(96, TH);
+  c.width = TW; c.height = TH;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, TW, TH);
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.font = fontStr(fam, base * scale);
+  let y = (TH - contentH * scale) / 2 + asc * scale;
+  const ts = state.tracking * base * scale;
+  for (const l of lines) {
+    const m = ctx.measureText(l);
+    const x0 = (TW - lineWidth(l, m, ts)) / 2 + m.actualBoundingBoxLeft;
+    if (Math.abs(ts) < 0.01) ctx.fillText(l, x0, y);
+    else {
+      let prefix = '';
+      Array.from(l).forEach((ch, i) => { ctx.fillText(ch, x0 + ctx.measureText(prefix).width + i * ts, y); prefix += ch; });
+    }
+    y += lineH * scale;
+  }
+  return { data: ctx.getImageData(0, 0, TW, TH).data, TH };
+}
+
+/* ---------- SVG / PNG → black-and-white form ---------- */
+// An image becomes a mask the same way text does: render it big, reduce it to luminance, and cut it
+// at a threshold. Which side is the form is decided once from the border (the background touches
+// the edge), and Invert flips it. Transparent images sit on a matte that contrasts with their ink.
+let srcImage = null; // { el, w, h, name, matte, inkIsDark }
+const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+
+async function readSourceFile(file) {
+  const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+  if (!isSvg && !/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('type');
+  if (!isSvg) { const el = await createImageBitmap(file); return { el, w: el.width, h: el.height }; }
+  // SVGs without a usable width/height rasterise at 0×0 or 300×150 in some browsers, so give them
+  // an explicit, large size from the viewBox before drawing.
+  const doc = new DOMParser().parseFromString(await file.text(), 'image/svg+xml');
+  const svg = doc.documentElement;
+  if (svg.nodeName.toLowerCase() !== 'svg' || doc.querySelector('parsererror')) throw new Error('svg');
+  const vb = (svg.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
+  const dim = (a) => { const v = svg.getAttribute(a); return v && !/%$/.test(v) ? parseFloat(v) : NaN; };
+  let w = dim('width'), h = dim('height');
+  if (!(w > 0 && h > 0)) { if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) { w = vb[2]; h = vb[3]; } else { w = h = 1024; } }
+  if (vb.length !== 4) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const k = 2048 / Math.max(w, h);
+  svg.setAttribute('width', w * k); svg.setAttribute('height', h * k);
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+  try { return { el: await loadImg(url), w: w * k, h: h * k }; } finally { URL.revokeObjectURL(url); }
+}
+
+function luminance(d, i) { return (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; }
+function otsu(hist, total) {
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, best = 0, t = 127;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue;
+    const wF = total - wB; if (!wF) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) { best = between; t = i; }
+  }
+  return (t + 0.5) / 255;
+}
+
+// Look at the image once: is it transparent, which matte to use, where to cut, which side is ink.
+function analyseImage(el, w, h) {
+  const aw = 512, ah = Math.max(1, Math.round(512 * h / w));
+  const c = document.createElement('canvas'); c.width = aw; c.height = ah;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(el, 0, 0, aw, ah);
+  let d = ctx.getImageData(0, 0, aw, ah).data;
+  let clear = 0, inkSum = 0, inkN = 0;
+  for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 250) clear++; if (d[i + 3] > 128) { inkSum += luminance(d, i); inkN++; } }
+  const transparent = clear / (aw * ah) > 0.01;
+  // Transparency reads as white paper, except for artwork that is almost all light (a white logo),
+  // which would vanish on white; that one sits on black instead.
+  const matte = transparent && inkN && inkSum / inkN > 0.8 ? '#000000' : '#ffffff';
+  ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = matte; ctx.fillRect(0, 0, aw, ah);
+  d = ctx.getImageData(0, 0, aw, ah).data;
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < d.length; i += 4) hist[Math.min(255, Math.round(luminance(d, i) * 255))]++;
+  const t = otsu(hist, aw * ah);
+  let border = 0, bn = 0;
+  for (let x = 0; x < aw; x++) for (const y of [0, ah - 1]) { border += luminance(d, (y * aw + x) * 4); bn++; }
+  for (let y = 0; y < ah; y++) for (const x of [0, aw - 1]) { border += luminance(d, (y * aw + x) * 4); bn++; }
+  return { matte, threshold: clamp(t, 0.05, 0.95), inkIsDark: border / bn > t };
+}
+
+function drawImageMask() {
+  const { el, w: iw, h: ih, matte, inkIsDark } = srcImage;
+  const pad = TW * 0.07;
+  let scale = (TW - 2 * pad) / iw;
+  const maxTH = Math.round(TW * 1.5);
+  if (ih * scale + 2 * pad > maxTH) scale = (maxTH - 2 * pad) / ih;
+  const TH = Math.max(96, Math.round(ih * scale + 2 * pad));
+  const c = document.createElement('canvas'); c.width = TW; c.height = TH;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = matte; ctx.fillRect(0, 0, TW, TH);
+  ctx.drawImage(el, (TW - iw * scale) / 2, (TH - ih * scale) / 2, iw * scale, ih * scale);
+  const img = ctx.getImageData(0, 0, TW, TH), d = img.data, N = TW * TH;
+  let L = new Float32Array(N);
+  for (let i = 0; i < N; i++) L[i] = luminance(d, i * 4);
+  // Clean up: blur before cutting, which drops specks and rounds detail too fine to cast.
+  const r = Math.round(state.cleanup * 7);
+  if (r) { const tmp = new Float32Array(N); boxBlur(L, L, tmp, TW, TH, r); boxBlur(L, L, tmp, TW, TH, r); }
+  const t = state.threshold, soft = 0.035;
+  const inkDark = inkIsDark !== state.invert;
+  let ink = 0;
+  for (let i = 0; i < N; i++) {
+    let v = clamp((L[i] - t + soft) / (2 * soft), 0, 1);
+    v = v * v * (3 - 2 * v);
+    const m = inkDark ? 1 - v : v;
+    if (m > 0.5) ink++;
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = m * 255;
+  }
+  drawMaskPreview(d, TW, TH);
+  const share = ink / N;
+  const warn = $('#srcWarn');
+  if (share < 0.002) { warn.textContent = 'Nothing is left to cast at this threshold. Move Threshold, or tick Invert.'; warn.hidden = false; }
+  else if (share > 0.9) { warn.textContent = 'Almost everything became form, so this will cast as a slab. Try Invert or move Threshold.'; warn.hidden = false; }
+  else warn.hidden = true;
+  return { data: d, TH };
+}
+
+// Show the cut as black form on white, the way the user described the reduction.
+function drawMaskPreview(d, w, h) {
+  const pv = $('#maskPreview');
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const im = new ImageData(w, h);
+  for (let i = 0; i < w * h; i++) { const v = 255 - d[i * 4]; im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+  c.getContext('2d').putImageData(im, 0, 0);
+  pv.height = Math.round(pv.width * h / w);
+  const pctx = pv.getContext('2d'); pctx.imageSmoothingQuality = 'high';
+  pctx.drawImage(c, 0, 0, pv.width, pv.height);
+  pv.hidden = false; $('#srcDropText').hidden = true;
+}
+
+async function loadSourceImage(file) {
+  const warn = $('#srcWarn'); warn.hidden = true;
+  if (!file) return;
+  setBusy(true, 'Reading image…');
+  try {
+    const { el, w, h } = await readSourceFile(file);
+    if (!(w > 0 && h > 0)) throw new Error('size');
+    const a = analyseImage(el, w, h);
+    srcImage = { el, w, h, name: file.name.replace(/\.[^.]+$/, ''), matte: a.matte, inkIsDark: a.inkIsDark };
+    setSlider('threshold', Math.round(a.threshold * 100) / 100);
+    $('#srcInvert').checked = state.invert = false;
+    rebuildSoon(0);
+    toast(`${file.name} loaded. Threshold set automatically.`);
+  } catch (e) {
+    warn.textContent = e.message === 'type'
+      ? `“${file.name}” isn’t an SVG or PNG. Try an SVG, PNG, WebP or JPG.`
+      : `Couldn’t read “${file.name}”. If it’s an SVG, check it opens in a browser.`;
+    warn.hidden = false;
+  } finally { setBusy(false); }
+}
+
+function setupSourcePicker() {
+  const drop = $('#srcDrop'), file = $('#srcFile');
+  $('#srcSeg').addEventListener('change', (e) => {
+    state.source = e.target.value;
+    $('#textSource').hidden = state.source !== 'text';
+    $('#imageSource').hidden = state.source !== 'image';
+    rebuildSoon(0);
+  });
+  drop.addEventListener('click', () => file.click());
+  drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('over'); loadSourceImage(e.dataTransfer.files[0]); });
+  file.addEventListener('change', (e) => { loadSourceImage(e.target.files[0]); e.target.value = ''; });
+  $('#srcInvert').addEventListener('change', (e) => { state.invert = e.target.checked; rebuildSoon(0); });
+}
+
+function makeTex(data, w, h, opts = {}) {
+  const t = new THREE.DataTexture(data, w, h, opts.format ?? THREE.RGBAFormat, opts.type ?? THREE.UnsignedByteType);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = opts.mips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+  t.generateMipmaps = !!opts.mips;
+  t.anisotropy = opts.mips ? 4 : 1;
+  if (opts.srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+
+/* ---------- Background worker: distance field, noise, bevel and texture baking ---------- */
+// The pixel work (about 0.4 s for a rebuild, 70 ms per slider step) runs off the main thread, so
+// typing and dragging never freeze the page. The worker keeps the distance field and noise between
+// requests; slider changes coalesce so only the latest settings are ever computed.
+function fieldCore(data, TW, TH) {
+  const N = TW * TH;
+  const gIn = new Float64Array(N), gOut = new Float64Array(N);
+  for (let i = 0; i < N; i++) { const inside = data[i * 4] > 127; gIn[i] = inside ? 1e20 : 0; gOut[i] = inside ? 0 : 1e20; }
+  edt2d(gIn, TW, TH); edt2d(gOut, TW, TH);
+  const sd = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = data[i * 4] / 255;
+    // Use the font's anti-aliasing for sub-pixel accuracy right at the outline.
+    if (a > 0.02 && a < 0.98) sd[i] = a - 0.5;
+    else sd[i] = gIn[i] > 0 ? Math.sqrt(gIn[i]) - 0.5 : -(Math.sqrt(gOut[i]) - 0.5);
+  }
+  // A raster outline steps one pixel every few rows on near-vertical edges, and the distance
+  // field inherits those steps. Chrome mirrors them as ladder lines, so smooth them out.
+  const tmpSd = new Float32Array(N);
+  for (let p = 0; p < 3; p++) boxBlur(sd, sd, tmpSd, TW, TH, 2);
+
+  // Noise fields, scaled in px so the grain size stays put regardless of word length.
+  const nA = makeSimplex(11), nB = makeSimplex(23), nC = makeSimplex(37), nD = makeSimplex(41),
+        nE = makeSimplex(53), nF = makeSimplex(67), nG = makeSimplex(79);
+  const F = {};
+  for (const k of ['coarse', 'medium', 'fine', 'pits', 'mottle', 'speck', 'edge', 'scratch']) F[k] = new Float32Array(N);
+  // Scratches: zero-crossings of noise stretched along three directions give thin, long, slightly
+  // wandering lines; a slow gate keeps them in clusters rather than an even mesh.
+  const nS = makeSimplex(91), nT = makeSimplex(103);
+  const ANG = [0.3, 1.9, 2.6].map((a) => [Math.cos(a), Math.sin(a)]);
+  for (let y = 0; y < TH; y++) {
+    for (let x = 0; x < TW; x++) {
+      const i = y * TW + x;
+      if (sd[i] < -16) continue;
+      F.coarse[i] = fbm(nA, x / 150, y / 150, 3);
+      F.medium[i] = fbm(nB, x / 36, y / 36, 2);
+      F.fine[i] = fbm(nC, x / 6.5, y / 6.5, 2);
+      F.pits[i] = nD(x / 12, y / 12);
+      F.mottle[i] = fbm(nE, x / 90, y / 90, 3);
+      F.speck[i] = nF(x / 2.4, y / 2.4);
+      F.edge[i] = fbm(nG, x / 44, y / 44, 4);
+      let sc = 0;
+      for (const [c, s] of ANG) {
+        const z = Math.abs(nS((x * c + y * s) / 260 + c * 10, (y * c - x * s) / 2.2));
+        if (z < 0.06) sc = Math.max(sc, 1 - z / 0.06);
+      }
+      const gate = nT(x / 140, y / 140);
+      F.scratch[i] = gate > 0.05 ? sc * Math.min(1, (gate - 0.05) * 4) : 0;
+    }
+  }
+
+  return { sd, F };
+}
+
+function composeCore(B, P) {
+  const { TW, TH, sd, F, h, hb, tmp, dd, disp, norm, alb, pack, alpha } = B;
+  const N = TW * TH;
+  const rock = P.mat === 'rock', liquid = P.mat === 'liquid';
+  // Rock and liquid are soft pillows. Metal is cast: a tight quarter-round bevel into a flat face,
+  // sitting on straight side walls, so it reads as a heavy solid rather than an inflated skin.
+  // Glass is cast too: the same heavy slab with a crisp bevel and walls, so it reads as a block.
+  const isMetal = P.mat === 'metal', glass = P.mat === 'glass';
+  const cast = isMetal || glass;
+  const R = cast ? 3 + P.puff * 34 : 4 + P.puff * 56;
+  const T = cast ? R * (W / TW) : P.thickWorld; // a circular bevel is as tall as it is wide
+  const wear = rock ? P.rockWear * 6 : 0;
+  const det = rock ? P.rockDetail : 0;
+  const mwear = isMetal ? P.mWear : 0, mdust = isMetal ? P.mDust : 0;
+  const corr = isMetal ? P.corr : 0;
+  const patC = isMetal && P.patina ? P.patina : null;
+  const mc = P.metalColor; // sRGB, for an sRGB texture
+  const mr = mc.r * 255, mg = mc.g * 255, mb = mc.b * 255;
+  const baseRough = P.baseRough;
+
+  // Melt: blur the outline field and grow it, so liquid letters swell, round off and pool together
+  // where they nearly touch, like surface tension pulling them into one body.
+  let src = sd, meltOff = 0;
+  if (liquid && P.melt > 0) {
+    const r = Math.round(P.melt * 16);
+    if (r) {
+      const sdm = B.sdm || (B.sdm = new Float32Array(N));
+      sdm.set(sd);
+      for (let p = 0; p < 3; p++) boxBlur(sdm, sdm, tmp, TW, TH, r);
+      src = sdm;
+    }
+    meltOff = P.melt * 4;
+  }
+
+  // 1. Raw bevel: circular profile from the edge, steep sides.
+  for (let y = 0; y < TH; y++) {
+    const ty = (TH - 1 - y) * TW;
+    for (let x = 0; x < TW; x++) {
+      const i = y * TW + x, o = (ty + x) * 4;
+      let d = src[i] + meltOff;
+      if (wear) d += F.edge[i] * wear - wear * 0.3;
+      if (corr) d += F.edge[i] * corr * 3.5 - corr; // corroded metal loses its crisp outline
+      dd[i] = d;
+      const av = d <= -0.5 ? 0 : d >= 0.5 ? 255 : ((d + 0.5) * 255) | 0;
+      alpha[o] = alpha[o + 1] = alpha[o + 2] = av; alpha[o + 3] = 255;
+      if (d <= 0) { h[i] = 0; continue; }
+      const t = d < R ? d / R : 1;
+      const round = Math.sqrt(1 - (1 - t) * (1 - t));
+      if (cast) {
+        // Faint casting ripple and scratch grooves, kept off the bevel so the rim stays crisp.
+        const face = d > R ? Math.min(1, (d - R) / 6) : 0;
+        h[i] = round + face * mwear * (F.medium[i] * 0.004 + F.coarse[i] * 0.008 - F.scratch[i] * 0.006);
+        if (corr) {
+          // Pitting and grain reach onto the bevel too, fading only at the very rim.
+          const e = d < R * 0.3 ? d / (R * 0.3) : 1;
+          // Mostly fine granular bite with a few shallow pits, not sponge holes.
+          const p = F.pits[i] - 0.5;
+          h[i] += corr * e * (F.fine[i] * 0.022 + F.speck[i] * 0.008 + F.medium[i] * 0.024 + F.coarse[i] * 0.025
+            - (p > 0 ? p * p * 0.32 : 0));
+        }
+      } else h[i] = 0.8 * round + 0.2 * (1 - Math.exp(-d / (R * 2.5)));
+    }
+  }
+
+  // 2. Inflate: blur the interior so the ridge along each stroke's spine rounds into a pillow,
+  //    keep the raw profile at the rim so the sides stay steep.
+  const rb = Math.max(2, Math.round(R * 0.45));
+  if (!cast) {
+    boxBlur(h, hb, tmp, TW, TH, rb);
+    boxBlur(hb, hb, tmp, TW, TH, rb);
+    boxBlur(hb, hb, tmp, TW, TH, rb); // three passes ≈ gaussian; mirrors show anything less
+  }
+  const rimW = R * 0.75;
+  for (let i = 0; i < N && !cast; i++) {
+    const d = dd[i];
+    if (d <= 0) continue;
+    const s = d < rimW ? d / rimW : 1;
+    const w = s * s * (3 - 2 * s);
+    let v = h[i] + (hb[i] * 1.12 - h[i]) * w;
+    if (det) {
+      const e = d < R * 0.4 ? d / (R * 0.4) : 1;
+      const p = F.pits[i] - 0.52;
+      v += det * e * (F.coarse[i] * 0.05 + F.medium[i] * 0.03 + F.fine[i] * 0.006 - (p > 0 ? p * p * 0.35 : 0));
+    }
+    h[i] = v;
+  }
+
+  boxBlur(h, hb, tmp, TW, TH, 6);
+
+  const k = T / (2 * (W / TW));
+  const slopeCap = cast ? 4 : 1.8; // metal's rim meets a wall, so it can stay steeper
+  const dither = DITHER;
+  for (let y = 0; y < TH; y++) {
+    const ty = (TH - 1 - y) * TW;
+    for (let x = 0; x < TW; x++) {
+      const i = y * TW + x, o = (ty + x) * 4, ti = ty + x;
+      const hi = h[i];
+      disp[ti] = toHalf(hi);
+      const hl = x > 0 ? h[i - 1] : hi, hr = x < TW - 1 ? h[i + 1] : hi;
+      const hu = y > 0 ? h[i - TW] : hi, hd = y < TH - 1 ? h[i + TW] : hi;
+      let nx = -(hr - hl) * k, ny = -(hu - hd) * k;
+      // The round profile goes vertical at the very rim; left alone those last pixels face sideways,
+      // catch no light and read as a dark ink outline. Cap the slope so the rim still rolls away but stays lit.
+      const sl = Math.hypot(nx, ny);
+      if (sl > slopeCap) { nx *= slopeCap / sl; ny *= slopeCap / sl; }
+      const inv = 1 / Math.sqrt(nx * nx + ny * ny + 1);
+      // Dither curved areas before 8-bit quantising so chrome doesn't show contour bands;
+      // leave flat faces exact, or a mirror shows the dither itself as speckle.
+      const dz = dither[i & 4095] * Math.min(1, (Math.abs(nx) + Math.abs(ny)) * 25);
+      norm[o] = (nx * inv * 0.5 + 0.5) * 255 + dz; norm[o + 1] = (ny * inv * 0.5 + 0.5) * 255 - dz; norm[o + 2] = (inv * 0.5 + 0.5) * 255 + dz; norm[o + 3] = 255;
+
+      const conv = hi - hb[i];
+      const ao = clamp(1 + Math.min(0, conv) * 4.5, 0.3, 1);
+      let rough, g = 1, warm = 0;
+      if (rock) {
+        const s = F.speck[i];
+        const sm = s > 0.62 ? 0.74 : s < -0.68 ? 1.12 : 1;
+        g = (0.84 + 0.2 * F.mottle[i]) * sm * (1 + clamp(conv * 2.4, -0.16, 0.16)) * (0.72 + 0.28 * ao);
+        warm = F.coarse[i] * 0.05;
+        rough = 0.86 + 0.14 * (F.fine[i] * 0.5 + 0.5);
+        alb[o] = clamp(g * (1 + warm) * 235, 0, 255); alb[o + 1] = clamp(g * 235, 0, 255); alb[o + 2] = clamp(g * (1 - warm) * 235, 0, 255); alb[o + 3] = 255;
+        pack[o] = ao * 255; pack[o + 1] = rough * 255; pack[o + 2] = 0; pack[o + 3] = 255;
+      } else if (liquid || glass) {
+        // A liquid is uniform; its look comes from the material and the moving surface.
+        alb[o] = alb[o + 1] = alb[o + 2] = alb[o + 3] = 255;
+        pack[o] = ao * 255; pack[o + 1] = 255; pack[o + 2] = 255; pack[o + 3] = 255;
+      } else {
+        const mot = F.mottle[i] * 0.5 + 0.5;
+        const sc = F.scratch[i] * mwear;
+        const polish = clamp(conv * 8, 0, 1) * mwear;                         // rubbed rims shine
+        const tarn = mwear * clamp(0.45 - mot, 0, 1) * 1.4 * (1 - polish);  // patchy tarnish elsewhere
+        const up = clamp(ny * inv * 2.5 + 0.4, 0, 1);                       // dust settles on upward faces
+        let dm = mdust * clamp((F.coarse[i] * 0.5 + 0.5) * 1.5 - 0.3, 0, 1) * (0.45 + 0.55 * up);
+        if (F.speck[i] > 0.72) dm += mdust * 0.9;
+        dm = clamp(dm, 0, 1);
+        const low = corr * clamp(-conv * 14, 0, 1);   // oxidised pits and recesses
+        const high = corr * clamp(conv * 10, 0, 1);   // rubbed-bright raised spots
+        const blotch = corr * clamp(0.45 - F.coarse[i], 0, 1) * 0.55; // dark oxidised patches
+        const shade = (1 - tarn * 0.3) * (1 - low * 0.6) * (1 - corr * 0.2 * (1 - mot)) * (1 - blotch) * (1 + high * 0.12);
+        // Patina (verdigris on bronze) replaces bare metal in the pits and oxidised patches.
+        const pv = patC ? clamp((low + blotch * 1.4) * 1.4, 0, 1) : 0;
+        const pt = 0.8 + 0.4 * mot;
+        let cr = mr * shade, cg = mg * shade, cb = mb * shade;
+        if (pv) { cr += (patC.r * 255 * pt - cr) * pv; cg += (patC.g * 255 * pt - cg) * pv; cb += (patC.b * 255 * pt - cb) * pv; }
+        alb[o] = clamp(cr + (196 - cr) * dm, 0, 255);
+        alb[o + 1] = clamp(cg + (186 - cg) * dm, 0, 255);
+        alb[o + 2] = clamp(cb + (170 - cb) * dm, 0, 255);
+        alb[o + 3] = 255;
+        let r = baseRough + mwear * (0.05 * mot + sc * 0.45 + tarn * 0.25) - polish * baseRough * 0.6
+          + corr * (0.3 * low + 0.12 * (1 - mot) + blotch * 0.4) - high * 0.18;
+        r = r + (0.85 - r) * pv;
+        r = r + (0.92 - r) * dm;
+        pack[o] = ao * 255; pack[o + 1] = clamp(r, 0.02, 1) * 255; pack[o + 2] = (1 - dm) * (1 - low * 0.6) * (1 - pv) * 255; pack[o + 3] = 255; // tarnish and patina aren't metal
+      }
+    }
+  }
+  return T;
+}
+
+function toHalf(v) {
+  toHalf.f[0] = v; const x = toHalf.u[0];
+  const sgn = (x >>> 16) & 0x8000; let e = ((x >>> 23) & 0xff) - 112; let m = x & 0x7fffff;
+  if (e <= 0) { if (e < -10) return sgn; m = (m | 0x800000) >> (1 - e); return sgn | ((m + 0x1000) >> 13); }
+  if (e > 30) return sgn | 0x7c00;
+  return sgn | ((e << 10) + ((m + 0x1000) >> 13));
+}
+toHalf.f = new Float32Array(1); toHalf.u = new Uint32Array(toHalf.f.buffer);
+
+function workerMain() {
+  let B = null;
+  self.onmessage = (e) => {
+    const m = e.data;
+    try {
+      if (m.type === 'build') {
+        const { sd, F } = fieldCore(new Uint8ClampedArray(m.data), m.TW, m.TH);
+        const N = m.TW * m.TH;
+        B = { TW: m.TW, TH: m.TH, sd, F, h: new Float32Array(N), hb: new Float32Array(N), tmp: new Float32Array(N), dd: new Float32Array(N),
+          disp: new Uint16Array(N), norm: new Uint8ClampedArray(N * 4), alb: new Uint8Array(N * 4), pack: new Uint8Array(N * 4), alpha: new Uint8Array(N * 4), sdm: null };
+      }
+      if (!B) throw new Error('no field');
+      const T = composeCore(B, m.P);
+      const out = { id: m.id, TW: B.TW, TH: B.TH, T, disp: B.disp.slice(), norm: B.norm.slice(), alb: B.alb.slice(), pack: B.pack.slice(), alpha: B.alpha.slice(), dd: B.dd.slice() };
+      self.postMessage(out, [out.disp.buffer, out.norm.buffer, out.alb.buffer, out.pack.buffer, out.alpha.buffer, out.dd.buffer]);
+    } catch (err) { self.postMessage({ id: m.id, error: String(err && err.message || err) }); }
+  };
+}
+
+const worker = (() => {
+  const src = [
+    `const W = ${W};`,
+    `const clamp = ${clamp.toString()};`,
+    `const DITHER = new Float32Array([${Array.from(DITHER).join(',')}]);`,
+    mulberry32, makeSimplex, fbm, edt1d, edt2d, boxBlur, fieldCore, composeCore, toHalf,
+    'toHalf.f = new Float32Array(1); toHalf.u = new Uint32Array(toHalf.f.buffer);',
+    workerMain, 'workerMain();',
+  ].map(String).join('\n');
+  return new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+})();
+const jobs = new Map();
+let jobId = 0;
+worker.onmessage = (e) => { const r = e.data, j = jobs.get(r.id); jobs.delete(r.id); if (!j) return; r.error ? j.reject(new Error(r.error)) : j.resolve(r); };
+function ask(msg, transfer = []) { msg.id = ++jobId; worker.postMessage(msg, transfer); return new Promise((resolve, reject) => jobs.set(msg.id, { resolve, reject })); }
+
+const srgbOf = (hex) => new THREE.Color(hex).getRGB({}, THREE.SRGBColorSpace);
+function composeParams() {
+  return {
+    mat: state.material, puff: state.puff, thickWorld: thicknessWorld(),
+    rockWear: state.rock.wear, rockDetail: state.rock.detail,
+    mWear: state.metal.wear, mDust: state.metal.dust, corr: state.metal.corrode,
+    patina: state.metal.patina ? srgbOf(state.metal.patina) : null, metalColor: srgbOf(state.metal.color), baseRough: state.metal.rough,
+    melt: state.liquid.melt,
+  };
+}
+
+let buildGen = 0;
+async function heavyBuild() {
+  const fromImage = state.source === 'image';
+  const text = state.text.trim();
+  if (fromImage ? !srcImage : !text) {
+    buildGen++;
+    group.visible = false;
+    $('#empty p').textContent = fromImage ? 'Choose an SVG or PNG to cast it.' : 'Type a word to cast it.';
+    $('#empty').hidden = false; return;
+  }
+  $('#empty').hidden = true;
+  const { data, TH } = fromImage ? drawImageMask() : drawMask(text, state.font);
+  const gen = ++buildGen;
+  const buf = data.buffer.slice(0);
+  const r = await ask({ type: 'build', data: buf, TW, TH, P: composeParams() }, [buf]);
+  if (gen !== buildGen) return; // a newer build superseded this one
+
+  if (field) for (const t of field.textures) t.dispose();
+  front.geometry.dispose();
+  const dispTex = makeTex(r.disp, TW, TH, { format: THREE.RedFormat, type: THREE.HalfFloatType });
+  const normTex = makeTex(r.norm, TW, TH, { mips: true });
+  const albTex = makeTex(r.alb, TW, TH, { mips: true, srgb: true });
+  const packTex = makeTex(r.pack, TW, TH, { mips: true });
+  const alphaTex = makeTex(r.alpha, TW, TH, { mips: false });
+  field = { TW, TH, dd: r.dd, dispTex, normTex, albTex, packTex, alphaTex, textures: [dispTex, normTex, albTex, packTex, alphaTex] };
+  const geo = new THREE.PlaneGeometry(W, W * TH / TW, TW - 1, TH - 1); // one vertex per texel, so rims don't show grid teeth
+  front.geometry = geo; back.geometry = geo;
+  Object.assign(matFront, { displacementMap: dispTex, normalMap: normTex, alphaMap: alphaTex, aoMap: packTex, roughnessMap: packTex });
+  matFront.needsUpdate = true;
+  group.visible = true;
+  applyComposed(r, true);
+  applyMaterial(true);
+  fitCamera();
+}
+
+/* ---------- Height, normals, albedo (cheap pass, in the worker) ---------- */
+let composing = false, composeAgain = false;
+async function compose() {
+  if (!field) return;
+  if (composing) { composeAgain = true; return; }
+  composing = true;
+  try {
+    do {
+      composeAgain = false;
+      const gen = buildGen;
+      const r = await ask({ type: 'compose', P: composeParams() });
+      if (gen === buildGen && field && r.TH === field.TH) applyComposed(r);
+    } while (composeAgain);
+  } catch (e) { console.error(e); }
+  finally { composing = false; }
+}
+
+function applyComposed(r, fresh = false) {
+  if (!fresh) {
+    field.dispTex.image.data = r.disp; field.normTex.image.data = r.norm; field.albTex.image.data = r.alb;
+    field.packTex.image.data = r.pack; field.alphaTex.image.data = r.alpha;
+    field.dd = r.dd;
+  }
+  for (const t of field.textures) t.needsUpdate = true;
+  const cast = state.material === 'metal' || state.material === 'glass';
+  matFront.displacementScale = r.T;
+  // Cast pieces get real depth: front and back faces pushed apart, joined by walls along the outline.
+  const wz = cast ? slabDepth() : 0;
+  front.position.z = wz;
+  back.position.z = -wz;
+  back.scale.z = cast ? -1 : -BACK_RATIO;
+  walls.visible = cast && wz > 0;
+  if (walls.visible) buildWalls(field.dd, field.TW, field.TH, W * field.TH / field.TW, wz);
+  syncBack();
+}
+
+const slabDepth = () => 0.03 + state.thickness * 0.32;
+
+// Marching squares on the outline (distance = 0), one quad per segment from back face to front face.
+function buildWalls(dd, TW, TH, Hw, wz) {
+  const pos = [], nor = [];
+  // Normals come from a smoothed copy of the outline field, so an eroded edge still shades as one
+  // continuous wall instead of a band per segment.
+  const sm = new Float32Array(dd), tmpW = new Float32Array(dd.length);
+  for (let p = 0; p < 3; p++) boxBlur(sm, sm, tmpW, TW, TH, 3);
+  const X = (x) => -W / 2 + x / (TW - 1) * W, Y = (y) => Hw / 2 - y / (TH - 1) * Hw;
+  const outward = (x, y) => {
+    // A wide stencil keeps wall shading smooth even when the outline is eroded.
+    const xi = clamp(Math.round(x), 3, TW - 4), yi = clamp(Math.round(y), 3, TH - 4), i = yi * TW + xi;
+    const nx = -(sm[i + 3] - sm[i - 3]), ny = sm[i + 3 * TW] - sm[i - 3 * TW]; // field grows inward; rows run down
+    const l = Math.hypot(nx, ny) || 1;
+    return [nx / l, ny / l];
+  };
+  const quad = (ax, ay, bx, by) => {
+    let na = outward(ax, ay), nb = outward(bx, by);
+    let pa = [X(ax), Y(ay)], pb = [X(bx), Y(by)];
+    // Wind so the face points outward: (b − a) × z must agree with the outward normal.
+    const ex = pb[0] - pa[0], ey = pb[1] - pa[1];
+    if (ey * (na[0] + nb[0]) - ex * (na[1] + nb[1]) < 0) { [pa, pb] = [pb, pa]; [na, nb] = [nb, na]; }
+    pos.push(pa[0], pa[1], -wz, pb[0], pb[1], -wz, pb[0], pb[1], wz, pa[0], pa[1], -wz, pb[0], pb[1], wz, pa[0], pa[1], wz);
+    nor.push(na[0], na[1], 0, nb[0], nb[1], 0, nb[0], nb[1], 0, na[0], na[1], 0, nb[0], nb[1], 0, na[0], na[1], 0);
+  };
+  const cross = (x0, y0, v0, x1, y1, v1) => { const t = v0 / (v0 - v1); return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]; };
+  for (let y = 0; y < TH - 1; y++) {
+    for (let x = 0; x < TW - 1; x++) {
+      const i = y * TW + x;
+      const a = dd[i], b = dd[i + 1], c = dd[i + TW + 1], d = dd[i + TW]; // tl, tr, br, bl
+      const code = (a > 0 ? 8 : 0) | (b > 0 ? 4 : 0) | (c > 0 ? 2 : 0) | (d > 0 ? 1 : 0);
+      if (code === 0 || code === 15) continue;
+      const pts = [];
+      if ((a > 0) !== (b > 0)) pts.push(cross(x, y, a, x + 1, y, b));         // top
+      if ((b > 0) !== (c > 0)) pts.push(cross(x + 1, y, b, x + 1, y + 1, c)); // right
+      if ((d > 0) !== (c > 0)) pts.push(cross(x, y + 1, d, x + 1, y + 1, c)); // bottom
+      if ((a > 0) !== (d > 0)) pts.push(cross(x, y, a, x, y + 1, d));         // left
+      if (pts.length === 2) quad(pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+      else if (pts.length === 4) { quad(pts[0][0], pts[0][1], pts[1][0], pts[1][1]); quad(pts[2][0], pts[2][1], pts[3][0], pts[3][1]); }
+    }
+  }
+  walls.geometry.dispose();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  walls.geometry = g;
+}
+
+/* ---------- Materials & lights ---------- */
+function applyMaterial(force = false) {
+  const rock = state.material === 'rock', glass = state.material === 'glass';
+  const liquid = state.material === 'liquid' || glass; // glass shares the clear-material path
+  const m = state[state.material];
+  const lq = glass ? { metalness: 0, transmission: 1, ior: 1.5, clearcoat: 0, atten: m.atten, dispersion: 0.25, env: 1.5 }
+    : liquid ? LIQUIDS[m.kind] : null;
+  // Metal bakes its colour, roughness and metalness (dust isn't metal) into maps; rock multiplies;
+  // a clear liquid stays white and takes its colour from absorption through its depth.
+  matFront.color.set(rock ? m.color : liquid ? (lq.transmission ? '#ffffff' : m.color) : '#ffffff');
+  matFront.metalness = rock ? 0 : liquid ? lq.metalness : 1;
+  matFront.roughness = rock || liquid ? m.rough : 1;
+  matFront.transmission = liquid ? lq.transmission : 0;
+  matFront.ior = liquid ? lq.ior : 1.5;
+  matFront.thickness = glass ? slabDepth() * 2 + 0.1 : liquid ? thicknessWorld() * 1.6 : 0;
+  matFront.attenuationColor.set(liquid && lq.transmission ? m.color : '#ffffff');
+  matFront.attenuationDistance = liquid && lq.atten ? lq.atten : Infinity;
+  matFront.clearcoat = liquid ? lq.clearcoat : 0;
+  matFront.clearcoatRoughness = 0.04;
+  matFront.dispersion = liquid && lq.dispersion ? lq.dispersion : 0;
+  if (matFront.metalnessMap !== (field ? field.packTex : null)) { matFront.metalnessMap = field ? field.packTex : null; matFront.needsUpdate = true; }
+  matFront.envMapIntensity = state.ambient * (liquid && lq.env ? lq.env : 1); // clear liquids live on their reflections
+  const wantMap = field && !liquid ? field.albTex : null;
+  // Rock is lit by the scene alone; metal and liquid also see the HDR studio.
+  const wantEnv = !rock && envStudioRT ? envStudioRT.texture : null;
+  if (matFront.map !== wantMap || matFront.envMap !== wantEnv || force) {
+    matFront.map = wantMap; matFront.envMap = wantEnv; matFront.needsUpdate = true;
+  }
+  syncBack();
+}
+
+function kelvin(k) {
+  const t = k / 100; let r, g, b;
+  if (t <= 66) { r = 255; g = 99.4708025861 * Math.log(t) - 161.1195681661; b = t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307; }
+  else { r = 329.698727446 * Math.pow(t - 60, -0.1332047592); g = 288.1221695283 * Math.pow(t - 60, -0.0755148492); b = 255; }
+  return new THREE.Color().setRGB(clamp(r, 0, 255) / 255, clamp(g, 0, 255) / 255, clamp(b, 0, 255) / 255, THREE.SRGBColorSpace);
+}
+function lightDir(az, el) {
+  const a = THREE.MathUtils.degToRad(az), e = THREE.MathUtils.degToRad(el);
+  return new THREE.Vector3(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a));
+}
+function applyLights() {
+  key.position.copy(lightDir(state.keyAz, state.keyEl)).multiplyScalar(8);
+  key.color.copy(kelvin(state.keyK));
+  key.intensity = state.keyPow;
+  rim.position.copy(lightDir(state.keyAz + 180, 22)).multiplyScalar(8);
+  rim.color.copy(kelvin(clamp(state.keyK + 1800, 2000, 12000)));
+  rim.intensity = state.rim;
+}
+
+function fitCamera() {
+  if (!field) return;
+  const w = W, h = W * field.TH / field.TW;
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const m = 1.34;
+  const d = Math.max((h * m / 2) / t, (w * m / 2) / (t * camera.aspect)) + thicknessWorld();
+  camera.position.set(0, 0, d);
+  camera.near = d * 0.05; camera.far = d * 6;
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+  shadowBase = Math.max(w, h) * 0.95;
+  const s = shadowBase * state.size;
+  Object.assign(key.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 0.5, far: 20 });
+  key.shadow.camera.updateProjectionMatrix();
+}
+
+/* ---------- Backgrounds ---------- */
+const bgCanvas = document.createElement('canvas');
+const envCanvas = document.createElement('canvas'); envCanvas.width = 1024; envCanvas.height = 512;
+const srcCanvas = document.createElement('canvas'); srcCanvas.width = 1600; srcCanvas.height = 1000;
+let bgSource = srcCanvas; // canvas or uploaded image
+let bgTex = null, envRT = null, envStudioRT = null;
+const canFilter = (() => { const c = document.createElement('canvas').getContext('2d'); c.filter = 'blur(2px)'; return c.filter === 'blur(2px)'; })();
+
+function paintBlurred(dst, src, blurPx) {
+  const ctx = dst.getContext('2d');
+  const sw = src.width, sh = src.height;
+  const s = Math.max(dst.width / sw, dst.height / sh);
+  const dw = sw * s, dh = sh * s, dx = (dst.width - dw) / 2, dy = (dst.height - dh) / 2;
+  if (blurPx < 0.5) { ctx.filter = 'none'; ctx.drawImage(src, dx, dy, dw, dh); return; }
+  if (canFilter) {
+    ctx.filter = `blur(${blurPx}px)`;
+    const m = blurPx * 2.5; // overdraw so edges don't fade to transparent
+    ctx.drawImage(src, dx - m, dy - m, dw + 2 * m, dh + 2 * m);
+    ctx.filter = 'none';
+    return;
+  }
+  // Fallback (no canvas filter): repeated half-scaling, then scale back up.
+  let cur = document.createElement('canvas'); cur.width = dst.width; cur.height = dst.height;
+  cur.getContext('2d').drawImage(src, dx, dy, dw, dh);
+  const steps = Math.min(6, Math.round(Math.log2(1 + blurPx / 2)));
+  const chain = [cur];
+  for (let i = 0; i < steps; i++) {
+    const n = document.createElement('canvas'); n.width = Math.max(2, cur.width >> 1); n.height = Math.max(2, cur.height >> 1);
+    const c = n.getContext('2d'); c.imageSmoothingQuality = 'high'; c.drawImage(cur, 0, 0, n.width, n.height);
+    chain.push(n); cur = n;
+  }
+  for (let i = chain.length - 2; i >= 0; i--) {
+    const c = chain[i].getContext('2d'); c.clearRect(0, 0, chain[i].width, chain[i].height);
+    c.imageSmoothingQuality = 'high'; c.drawImage(chain[i + 1], 0, 0, chain[i].width, chain[i].height);
+  }
+  ctx.drawImage(chain[0], 0, 0);
+}
+
+function updateBackground() {
+  const sw = bgSource.width, sh = bgSource.height;
+  const s = Math.min(1, 2048 / Math.max(sw, sh));
+  bgCanvas.width = Math.round(sw * s); bgCanvas.height = Math.round(sh * s);
+  paintBlurred(bgCanvas, bgSource, 0);
+  if (bgTex) bgTex.dispose();
+  bgTex = new THREE.CanvasTexture(bgCanvas);
+  bgTex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = bgTex;
+  coverBackground();
+  updateEnv();
+}
+
+function coverBackground() {
+  if (!bgTex) return;
+  const ia = bgCanvas.width / bgCanvas.height, va = camera.aspect;
+  if (va > ia) { bgTex.repeat.set(1, ia / va); bgTex.offset.set(0, (1 - ia / va) / 2); }
+  else { bgTex.repeat.set(va / ia, 1); bgTex.offset.set((1 - va / ia) / 2, 0); }
+}
+
+/* ---------- Environment: the scene's colours plus an HDR studio ---------- */
+// Metal is only as good as what it reflects. A canvas can't hold values above 1.0, so the
+// softboxes live in a small 3D scene with emissive panels at 3–20× brightness, black flags
+// that carve dark bands into the reflections, and a floor that gives chrome its horizon.
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+const envTex = new THREE.CanvasTexture(envCanvas);
+envTex.colorSpace = THREE.SRGBColorSpace;
+const envSkyMat = new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide });
+envScene.add(new THREE.Mesh(new THREE.SphereGeometry(30, 48, 24), envSkyMat));
+const studio = new THREE.Group();
+envScene.add(studio);
+function card(w, h, color) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+  studio.add(m); return m;
+}
+const keyBox = card(4.6, 6.4, 0xffffff);
+const fillBox = card(2.6, 4.2, 0xffffff);
+const topStrip = card(12, 1.3, 0xffffff);
+const rimStrip = card(0.8, 6.5, 0xffffff);
+const frontFill = card(14, 5, 0xffffff); // behind the camera: what flat faces mirror
+const flagA = card(3.6, 9, 0x000000);
+const flagB = card(3.6, 9, 0x000000);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.MeshBasicMaterial({ color: 0x18181b }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -4; // horizon ~8° below eye level: a tilt sweeps it across flat faces
+studio.add(floor);
+function place(m, az, el, r) { m.position.copy(lightDir(az, el)).multiplyScalar(r); m.lookAt(0, 0, 0); }
+
+function updateEnv() {
+  paintBlurred(envCanvas, bgSource, 18);
+  envTex.needsUpdate = true;
+  // A bright world would flood everything at full strength; pull it down in proportion.
+  const lum = bgLuminance();
+  envSkyMat.color.setScalar(1 - 0.38 * clamp((lum - 0.5) / 0.5, 0, 1));
+  const az = state.keyAz;
+  keyBox.material.color.copy(kelvin(state.keyK)).multiplyScalar(2.2 * state.keyPow + 0.5);
+  place(keyBox, az, state.keyEl, 8);
+  fillBox.material.color.setScalar(1.6);
+  place(fillBox, az + 115, 10, 8);
+  frontFill.material.color.setScalar(1.3);
+  place(frontFill, 0, 9, 9);
+  topStrip.material.color.setScalar(3.2);
+  place(topStrip, 0, 80, 8);
+  rimStrip.material.color.copy(kelvin(clamp(state.keyK + 1800, 2000, 12000))).multiplyScalar(2.6 * state.rim + 0.3);
+  place(rimStrip, az + 180, 16, 8);
+  // Flags sit off to the sides (not straight ahead) so bevels catch dark bands but faces don't go black.
+  place(flagA, 82, 4, 6.5);
+  place(flagB, -88, 4, 6.5);
+  studio.visible = false;
+  const plain = pmrem.fromScene(envScene, 0, 0.1, 100);
+  if (envRT) envRT.dispose();
+  envRT = plain;
+  scene.environment = envRT.texture;
+  if (envStudioRT) { envStudioRT.dispose(); envStudioRT = null; }
+  if (state.studio) { studio.visible = true; envStudioRT = pmrem.fromScene(envScene, 0, 0.1, 100); }
+  applyMaterial();
+}
+
+// The scene is a flat colour (or the person's own design); the piece is the subject.
+function setBgColor(hex, preset = 'color') {
+  state.bg = preset; state.bgColor = hex;
+  srcCanvas.width = 64; srcCanvas.height = 40; // flat fill: tiny is enough, aspect still covers
+  const ctx = srcCanvas.getContext('2d');
+  ctx.fillStyle = hex; ctx.fillRect(0, 0, srcCanvas.width, srcCanvas.height);
+  bgSource = srcCanvas;
+  updateBackground();
+}
+function bgLuminance() {
+  if (state.bg === 'custom') return 0.5;
+  const c = new THREE.Color(state.bgColor).getRGB({}, THREE.SRGBColorSpace);
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+let customImage = null;
+async function loadDesign(file) {
+  const warn = $('#bgWarn');
+  warn.hidden = true;
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { warn.textContent = `“${file.name}” isn’t an image. Try a JPG, PNG or WebP.`; warn.hidden = false; return; }
+  setBusy(true, 'Loading design…');
+  try {
+    const img = await createImageBitmap(file);
+    customImage = img;
+    bgSource = img;
+    state.bg = 'custom';
+    // The frame should match the design's shape.
+    const r = $('#bg-custom'); r.disabled = false; r.checked = true;
+    $('label[for=bg-custom]').hidden = false;
+    $('#fr-design').disabled = false;
+    setFrame('design');
+    updateBackground();
+    toast(`Design set: ${img.width}×${img.height}. It lights the piece too.`);
+  } catch (e) {
+    warn.textContent = 'Couldn’t read that image. Try a different JPG, PNG or WebP.'; warn.hidden = false;
+  } finally { setBusy(false); }
+}
+
+/* ---------- Frame & sizing ---------- */
+function frameAspect() {
+  switch (state.frame) {
+    case '1:1': return 1;
+    case '4:5': return 4 / 5;
+    case '9:16': return 9 / 16;
+    case '16:9': return 16 / 9;
+    case 'design': return customImage ? customImage.width / customImage.height : null;
+    default: return null;
+  }
+}
+let renderLocked = false; // true while an export owns the canvas size
+function resize() {
+  if (renderLocked) return;
+  const r = stage.getBoundingClientRect();
+  let w = r.width, h = r.height;
+  const a = frameAspect();
+  stage.classList.toggle('framed', !!a);
+  if (a) {
+    const m = 28, aw = Math.max(1, w - 2 * m), ah = Math.max(1, h - 2 * m);
+    if (aw / ah > a) { h = ah; w = ah * a; } else { w = aw; h = aw / a; }
+  }
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  fitCamera(); coverBackground();
+}
+new ResizeObserver(resize).observe(stage);
+
+function setFrame(v) {
+  state.frame = v;
+  const r = document.getElementById(`fr-${v.replace(':', '-')}`); if (r) r.checked = true;
+  resize();
+}
+
+/* ---------- Interaction ---------- */
+let manualYaw = 0, manualPitch = 0, dragging = false, lastX = 0, lastY = 0;
+// World units per screen pixel at the piece's depth, so a drag moves it exactly under the cursor.
+const worldPerPx = () => 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / canvas.clientHeight;
+let dragMode = 'move';
+function nudgePos(dx, dy) {
+  const lim = 6;
+  state.posX = clamp(state.posX + dx, -lim, lim); state.posY = clamp(state.posY + dy, -lim, lim);
+}
+stage.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || rec) return;
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  dragMode = e.shiftKey ? (state.dragMode === 'move' ? 'turn' : 'move') : state.dragMode;
+  stage.setPointerCapture(e.pointerId); stage.classList.add('dragging');
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  if (dragMode === 'move') { const k = worldPerPx(); nudgePos(dx * k, -dy * k); }
+  else {
+    manualYaw = clamp(manualYaw + dx * 0.006, -1.3, 1.3);
+    manualPitch = clamp(manualPitch + dy * 0.004, -0.6, 0.6);
+  }
+  lastX = e.clientX; lastY = e.clientY;
+});
+stage.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  setSlider('size', clamp(state.size * Math.exp(-e.deltaY * 0.0015), 0.2, 2.5));
+}, { passive: false });
+const endDrag = () => { dragging = false; stage.classList.remove('dragging'); };
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('keydown', (e) => {
+  const step = { ArrowLeft: [-0.08, 0], ArrowRight: [0.08, 0], ArrowUp: [0, -0.06], ArrowDown: [0, 0.06] }[e.key];
+  if (!step || rec) return;
+  e.preventDefault();
+  if ((state.dragMode === 'move') !== e.shiftKey) { const k = worldPerPx() * (e.altKey ? 2 : 10); nudgePos(Math.sign(step[0]) * k, -Math.sign(step[1]) * k); return; }
+  manualYaw = clamp(manualYaw + step[0], -1.3, 1.3);
+  manualPitch = clamp(manualPitch + step[1], -0.6, 0.6);
+});
+stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('drop'); });
+stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
+stage.addEventListener('drop', (e) => { e.preventDefault(); stage.classList.remove('drop'); loadDesign(e.dataTransfer.files[0]); });
+
+/* ---------- Panel ---------- */
+function throttleRAF(fn) {
+  let queued = false;
+  return () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; fn(); }); };
+}
+const scheduleCompose = throttleRAF(() => compose());
+let envTimer;
+const scheduleEnv = () => { clearTimeout(envTimer); envTimer = setTimeout(updateEnv, 90); };
+let bgTimer;
+const scheduleBgColor = (hex) => { clearTimeout(bgTimer); bgTimer = setTimeout(() => setBgColor(hex), 40); };
+const ACTIONS = {
+  compose: scheduleCompose,
+  material: () => applyMaterial(),
+  light: () => { applyLights(); scheduleEnv(); },
+  rebuild: () => rebuildSoon(120),
+  // Metal bakes absolute roughness (dust, scratches) into its map, so it needs a recompose.
+  roughness: () => { applyMaterial(); if (state.material === 'metal') scheduleCompose(); },
+};
+
+function setSlider(id, v) {
+  const s = SLIDERS.find((x) => x.id === id);
+  s.set(v); s.input.value = v; s.out.textContent = s.fmt(v);
+}
+
+function chips(host, name, items, current, prefix) {
+  host.innerHTML = items.map(([v, l, disabled, hidden]) => {
+    const id = `${prefix}-${v.replace(':', '-')}`;
+    return `<input type="radio" name="${name}" id="${id}" value="${v}" ${disabled ? 'disabled' : ''} ${v === current ? 'checked' : ''}>` +
+      `<label for="${id}" ${hidden ? 'hidden' : ''}>${l}</label>`;
+  }).join('');
+}
+
+function buildPanel() {
+  for (const s of SLIDERS) {
+    const host = document.querySelector(`[data-sliders="${s.sec}"]`);
+    const f = document.createElement('div');
+    f.className = 'field';
+    f.innerHTML = `<div class="row"><label for="s-${s.id}">${s.label}</label><output id="o-${s.id}" for="s-${s.id}"></output></div>
+      <input type="range" id="s-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    host.appendChild(f);
+    const input = f.querySelector('input'), out = f.querySelector('output');
+    s.input = input; s.out = out;
+    input.addEventListener('input', () => {
+      const v = parseFloat(input.value); s.set(v); out.textContent = s.fmt(v);
+      if (s.on) ACTIONS[s.on]();
+    });
+  }
+  syncSliders();
+
+  setupFontPicker();
+  setupSourcePicker();
+
+  const ta = $('#text');
+  const syncLead = () => { $('#leadHelp').hidden = state.text.split('\n').filter((l) => l.trim()).length > 1; };
+  ta.addEventListener('input', () => { state.text = ta.value; syncLead(); rebuildSoon(320); });
+  syncLead();
+
+  // Liquid is built (finishes, melt, flow) but hidden for now; add ['liquid', 'Liquid'] back to show it.
+  chips($('#matSeg'), 'mat', [['rock', 'Rock'], ['metal', 'Metal'], ['glass', 'Glass'], ['ascii', 'ASCII <span class="soon">Soon</span>', true]], state.material, 'm');
+  $('#matSeg').addEventListener('change', (e) => {
+    state.material = e.target.value;
+    renderSwatches(); syncSliders(); compose(); applyMaterial();
+  });
+  renderSwatches();
+
+  chips($('#bgSeg'), 'bg', [...BACKGROUNDS.map(([v, l]) => [v, l]), ['custom', 'Your design', true, true]], state.bg, 'bg');
+  const bgPick = $('#bgColor');
+  $('#bgSeg').addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (v === 'custom') { if (customImage) { bgSource = customImage; state.bg = 'custom'; updateBackground(); } return; }
+    const hex = BACKGROUNDS.find((b) => b[0] === v)[2];
+    bgPick.value = hex; setBgColor(hex, v);
+  });
+  bgPick.addEventListener('input', () => {
+    // A picked colour isn't one of the named chips, so clear them.
+    $('#bgSeg').querySelectorAll('input').forEach((r) => { r.checked = BACKGROUNDS.some((b) => b[0] === r.value && b[2] === bgPick.value); });
+    scheduleBgColor(bgPick.value);
+  });
+  $('#uploadBtn').addEventListener('click', () => $('#file').click());
+  $('#file').addEventListener('change', (e) => { loadDesign(e.target.files[0]); e.target.value = ''; });
+  $('#studio').addEventListener('change', (e) => { state.studio = e.target.checked; updateEnv(); });
+  $('#backdrop').addEventListener('change', (e) => { state.backdrop = e.target.checked; backdrop.visible = state.backdrop; });
+
+  chips($('#frameSeg'), 'frame', FRAMES.map(([v, l]) => [v, l, v === 'design']), state.frame, 'fr');
+  $('#frameSeg').addEventListener('change', (e) => setFrame(e.target.value));
+
+  $('#dragSeg').addEventListener('change', (e) => { state.dragMode = e.target.value; });
+  $('#centerBtn').addEventListener('click', () => { state.posX = state.posY = 0; setSlider('size', 1); manualYaw = manualPitch = 0; });
+  const tb = $('#turnBtn');
+  const syncTurn = () => { tb.setAttribute('aria-pressed', String(state.turn)); tb.textContent = state.turn ? 'Pause preview' : 'Play preview'; };
+  tb.addEventListener('click', () => { state.turn = !state.turn; syncTurn(); });
+  syncTurn();
+
+  $('#exBgSeg').addEventListener('change', (e) => { state.exportBg = e.target.value; syncExportHelp(); });
+  $('#exSizeSeg').addEventListener('change', (e) => { state.exportSize = +e.target.value; syncExportHelp(); });
+  syncExportHelp();
+
+  $('#exportBtn').addEventListener('click', exportPNG);
+  $('#videoBtn').addEventListener('click', exportVideo);
+}
+
+function syncExportHelp() {
+  $('#exportHelp').textContent = state.exportBg === 'transparent'
+    ? `PNG: transparent, trimmed to the piece, ${state.exportSize}px on the long side. Video always includes the scene.`
+    : `PNG: the scene in the current frame, ${state.exportSize}px on the long side. Video: 1920px.`;
+}
+
+function syncSliders() {
+  for (const s of SLIDERS) {
+    const v = s.get(); s.input.value = v; s.out.textContent = s.fmt(v);
+    s.input.closest('.field').hidden = !!s.only && s.only !== state.material;
+  }
+}
+
+function renderSwatches() {
+  const host = $('#swatches');
+  const mat = state.material;
+  const list = FINISHES[mat];
+  const cur = state[mat].color.toLowerCase();
+  host.innerHTML = list.map((f, i) =>
+    `<input type="radio" name="sw" id="sw-${i}" value="${i}" ${f.color === cur ? 'checked' : ''}>` +
+    `<label class="sw" for="sw-${i}" style="background:${f.color}" title="${f.name}"><span class="sr">${f.name}</span></label>`).join('') +
+    `<label class="custom">Custom <input type="color" id="swCustom" value="${cur}" aria-label="Custom colour"></label>`;
+  const nameEl = $('#swName');
+  const syncName = () => { const hit = list.find((f) => f.color === state[mat].color.toLowerCase()); nameEl.textContent = hit ? hit.name : 'Custom colour'; };
+  syncName();
+  host.querySelectorAll('input[name=sw]').forEach((r) => r.addEventListener('change', () => {
+    const f = list[+r.value];
+    state[mat].color = f.color;
+    if (f.rough !== undefined) setSlider('rough', f.rough);
+    if (f.corrode !== undefined) setSlider('corrode', f.corrode);
+    if (f.wear !== undefined) setSlider('mwear', f.wear);
+    if ('patina' in f) state.metal.patina = f.patina;
+    if ('kind' in f) state.liquid.kind = f.kind;
+    if ('atten' in f) state.glass.atten = f.atten;
+    $('#swCustom').value = f.color; syncName(); applyMaterial();
+    if (mat === 'metal') scheduleCompose(); // metal colour is baked with its dust and tarnish
+  }));
+  $('#swCustom').addEventListener('input', (e) => {
+    state[mat].color = e.target.value;
+    host.querySelectorAll('input[name=sw]').forEach((r) => r.checked = list[+r.value].color === e.target.value);
+    syncName(); applyMaterial();
+    if (mat === 'metal') scheduleCompose();
+  });
+}
+
+/* ---------- Font picker ---------- */
+// One combobox for every font: Korra's own, then the ones installed on this computer. Chrome and
+// Edge can list installed fonts (Local Font Access, asks once); elsewhere the person types a name.
+// Each installed face loads through local() under a private alias, so a specific style like
+// "Futura Condensed ExtraBold" works, and the same alias previews the row and renders the piece.
+const CURATED = Object.keys(FONTS);
+const fontLabel = (fam) => fam === 'UnifrakturMaguntia' ? 'Unifraktur' : fam;
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const aliasPromises = new Map(); // full font name -> Promise<alias>
+const aliasNames = new Map();    // alias -> full font name
+let aliasCount = 0;
+let localFonts = null;           // full font name -> PostScript name
+let localState = 'idle';         // idle | loading | ready | denied | unsupported
+function aliasFor(name) {
+  if (!aliasPromises.has(name)) {
+    const p = (async () => {
+      const alias = `korra-local-${++aliasCount}`;
+      const ps = localFonts && localFonts.get(name);
+      const q = (n) => n.replace(/"/g, '\\"');
+      const face = new FontFace(alias, ps && ps !== name ? `local("${q(ps)}"), local("${q(name)}")` : `local("${q(name)}")`);
+      await face.load();
+      document.fonts.add(face);
+      FONTS[alias] = 400;
+      aliasNames.set(alias, name);
+      return alias;
+    })();
+    p.catch(() => aliasPromises.delete(name));
+    aliasPromises.set(name, p);
+  }
+  return aliasPromises.get(name);
+}
+
+function setupFontPicker() {
+  // Headless UI's combobox model: the input shows the chosen font when closed and holds the query
+  // when open; typing filters; ↑/↓ move, Home/End jump, Enter picks, Esc restores, Tab picks
+  // what's highlighted once you've typed. Every row previews in its own face.
+  const field = $('#fontField'), combo = field.querySelector('.combo'), input = $('#fontInput'), btn = $('#fontBtn');
+  const pop = $('#fontPop'), list = $('#fontList'), foot = $('#fontFoot');
+  const MAX_ROWS = 250;
+  let options = [], active = -1, typed = false;
+
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const el = e.target; io.unobserve(el);
+      aliasFor(el.dataset.name).then((a) => { el.style.fontFamily = `"${a}", Inter, sans-serif`; })
+        .catch(() => { el.classList.add('missing'); el.title = 'This face couldn’t be loaded'; });
+    }
+  }, { root: list, rootMargin: '160px 0px' });
+
+  const currentName = () => aliasNames.get(state.font) || fontLabel(state.font);
+  function showValue() {
+    input.value = currentName();
+    input.style.fontFamily = `"${state.font}", Georgia, serif`;
+    input.style.fontWeight = FONTS[state.font];
+    input.classList.add('closed');
+  }
+
+  function render() {
+    io.disconnect();
+    const raw = typed ? input.value.trim() : '', q = raw.toLowerCase();
+    const rows = [];
+    let n = 0;
+    const opt = (attrs, label, style = '') => rows.push(
+      `<div role="option" id="fo-${n++}" class="font-opt${attrs.action ? ' action' : ''}" ${Object.entries(attrs).map(([k, v]) => `data-${k}="${esc(String(v))}"`).join(' ')}` +
+      ` aria-selected="${!!attrs.selected}" style="${style}"><span>${esc(label)}</span></div>`);
+    const note = (t) => rows.push(`<div class="font-note" role="presentation">${esc(t)}</div>`);
+    const curated = CURATED.filter((f) => fontLabel(f).toLowerCase().includes(q));
+    if (curated.length) {
+      rows.push('<div class="font-group" role="presentation">Korra fonts</div>');
+      for (const f of curated) opt({ value: f, selected: state.font === f }, fontLabel(f), `font-family:'${f}',Georgia,serif;font-weight:${FONTS[f]}`);
+    }
+    rows.push('<div class="font-group" role="presentation">On this computer</div>');
+    foot.textContent = ''; foot.classList.remove('warn');
+    if (localState === 'idle') opt({ action: 'list' }, 'Show fonts on this computer');
+    else if (localState === 'loading') note('Reading your fonts…');
+    else if (localState === 'ready') {
+      const all = [...localFonts.keys()];
+      const hits = q ? all.filter((name) => name.toLowerCase().includes(q)) : all;
+      const cur = aliasNames.get(state.font);
+      for (const name of hits.slice(0, MAX_ROWS)) opt({ value: `local:${name}`, name, local: 1, selected: name === cur }, name);
+      if (!hits.length) note(`No installed fonts match “${raw}”.`);
+      foot.textContent = hits.length > MAX_ROWS
+        ? `Showing ${MAX_ROWS} of ${hits.length.toLocaleString()}. Keep typing to narrow.`
+        : `${hits.length.toLocaleString()} ${q ? 'matching' : 'installed'} font${hits.length === 1 ? '' : 's'}`;
+    } else if (raw) opt({ action: 'typed' }, `Use “${raw}” from this computer`);
+    else note(localState === 'denied'
+      ? 'Font access was blocked. Type an installed font’s exact name, or allow fonts for this page in site settings.'
+      : 'This browser can’t list your fonts. Type an installed font’s exact name, like “Futura Bold”.');
+    list.innerHTML = rows.join('');
+    options = [...list.querySelectorAll('[role=option]')];
+    options.forEach((el) => { if (el.dataset.local) io.observe(el); });
+    const sel = options.findIndex((el) => el.getAttribute('aria-selected') === 'true');
+    setActive(q ? 0 : Math.max(0, sel));
+  }
+
+  function setActive(i) {
+    if (!options.length) { active = -1; input.removeAttribute('aria-activedescendant'); return; }
+    active = clamp(i, 0, options.length - 1);
+    options.forEach((el, k) => el.classList.toggle('active', k === active));
+    input.setAttribute('aria-activedescendant', options[active].id);
+    options[active].scrollIntoView({ block: 'nearest' });
+  }
+
+  async function requestLocal() {
+    if (localState !== 'idle') return;
+    if (!('queryLocalFonts' in window)) { localState = 'unsupported'; render(); return; }
+    localState = 'loading'; render();
+    try {
+      const faces = await window.queryLocalFonts();
+      const m = new Map();
+      for (const f of faces) m.set(f.fullName, f.postscriptName);
+      localFonts = new Map([...m].sort((a, b) => a[0].localeCompare(b[0])));
+      localState = 'ready';
+    } catch (e) {
+      // Without a click the browser refuses before asking; keep the row so a click can ask.
+      localState = e && e.name === 'SecurityError' ? 'idle' : 'denied';
+    }
+    if (!pop.hidden) render();
+  }
+
+  function isOpen() { return !pop.hidden; }
+  function open(fromPointer = false) {
+    if (isOpen()) return;
+    pop.hidden = false; combo.dataset.open = ''; input.setAttribute('aria-expanded', 'true');
+    typed = false;
+    input.classList.remove('closed');
+    input.style.fontFamily = ''; input.style.fontWeight = '';
+    render();
+    input.select();
+    if (fromPointer) requestLocal(); // a click counts as permission-worthy intent; Tab focus doesn't
+  }
+  function close() {
+    if (!isOpen()) return;
+    pop.hidden = true; delete combo.dataset.open; input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant'); io.disconnect();
+    showValue();
+  }
+
+  function pick(fam) {
+    const changed = fam !== state.font;
+    state.font = fam;
+    close();
+    $('#fontWarn').hidden = true;
+    if (changed) ensureFont().then(() => rebuildSoon(0));
+  }
+  async function choose(el) {
+    if (!el) return;
+    const action = el.dataset.action;
+    if (action === 'list') { localState = 'idle'; return requestLocal(); }
+    if (action === 'typed' || el.dataset.local) {
+      const name = action === 'typed' ? input.value.trim() : el.dataset.name;
+      foot.textContent = `Loading ${name}…`; foot.classList.remove('warn');
+      try { pick(await aliasFor(name)); }
+      catch (e) { foot.textContent = `Couldn’t find “${name}” on this computer. Check the spelling.`; foot.classList.add('warn'); }
+      return;
+    }
+    pick(el.dataset.value);
+  }
+
+  input.addEventListener('pointerdown', () => { if (!isOpen()) { open(true); } });
+  input.addEventListener('focus', () => { if (!isOpen()) open(false); });
+  input.addEventListener('input', () => { if (!isOpen()) open(false); typed = true; render(); });
+  btn.addEventListener('pointerdown', (e) => e.preventDefault()); // keep focus in the input
+  btn.addEventListener('click', () => { if (isOpen()) close(); else { input.focus(); open(true); } });
+  input.addEventListener('keydown', (e) => {
+    if (!isOpen()) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(false); }
+      return;
+    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+    else if (e.key === 'Home' || e.key === 'PageUp') { e.preventDefault(); setActive(0); }
+    else if (e.key === 'End' || e.key === 'PageDown') { e.preventDefault(); setActive(options.length - 1); }
+    else if (e.key === 'Enter') { e.preventDefault(); choose(options[active]); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); input.select(); }
+    else if (e.key === 'Tab') { if (typed && options[active] && !options[active].dataset.action) choose(options[active]); else close(); }
+  });
+  input.addEventListener('blur', () => setTimeout(() => { if (!field.contains(document.activeElement)) close(); }, 0));
+  list.addEventListener('pointerdown', (e) => e.preventDefault()); // clicking a row shouldn't blur the input
+  list.addEventListener('pointermove', (e) => { const el = e.target.closest('[role=option]'); if (el) setActive(options.indexOf(el)); });
+  list.addEventListener('click', (e) => choose(e.target.closest('[role=option]')));
+  showValue();
+}
+
+let rebuildTimer;
+function rebuildSoon(ms) {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(async () => {
+    setBusy(true); await nextPaint();
+    try { await heavyBuild(); }
+    catch (e) { console.error(e); toast('Couldn’t build that shape. Try different text.', true); }
+    finally { setBusy(false); }
+  }, ms);
+}
+
+async function ensureFont() {
+  const warn = $('#fontWarn'); warn.hidden = true;
+  if (state.font === 'Georgia') return;
+  try { await document.fonts.load(fontStr(state.font, 100), state.text || 'Korra'); } catch {}
+  if (!document.fonts.check(fontStr(state.font, 100))) {
+    warn.textContent = `Couldn’t load ${state.font}, so Georgia is standing in. Check your connection.`;
+    warn.hidden = false;
+  }
+}
+
+/* ---------- Export ---------- */
+const slug = () => (state.source === 'image' && srcImage ? srcImage.name : state.text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'korra';
+function exportDims(longEdge) {
+  const a = camera.aspect;
+  const w = a >= 1 ? longEdge : Math.round(longEdge * a);
+  const h = a >= 1 ? Math.round(longEdge / a) : longEdge;
+  return [w & ~1, h & ~1]; // even sizes keep video encoders happy
+}
+function lockRenderSize(w, h) {
+  renderLocked = true;
+  renderer.setPixelRatio(1);
+  renderer.setSize(w, h, false);
+}
+function unlockRenderSize() { renderLocked = false; resize(); }
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function setExportBusy(btn, label) {
+  for (const b of [$('#exportBtn'), $('#videoBtn')]) b.disabled = !!label && b !== btn;
+  if (label) { btn.setAttribute('aria-busy', 'true'); btn.textContent = label; }
+  else { btn.removeAttribute('aria-busy'); }
+}
+
+// Crop a transparent render to the pixels that have something in them, plus a small margin.
+function trimToContent(src) {
+  const w = src.width, h = src.height;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(src, 0, 0);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 4;
+    for (let x = 0; x < w; x++) {
+      if (d[row + x * 4 + 3] > 3) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+  }
+  if (x1 < 0) return null;
+  const pad = Math.round(Math.max(w, h) * 0.02);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+
+async function exportPNG() {
+  const btn = $('#exportBtn');
+  if (btn.getAttribute('aria-busy') === 'true' || rec) return;
+  if (!field || !group.visible) { toast('Type some text first, then export.', true); return; }
+  setExportBusy(btn, 'Exporting…');
+  await nextPaint();
+  const transparent = state.exportBg === 'transparent';
+  const prevBg = scene.background;
+  try {
+    const [ew, eh] = exportDims(state.exportSize);
+    lockRenderSize(ew, eh);
+    if (transparent) { scene.background = null; renderer.setClearColor(0x000000, 0); }
+    renderer.render(scene, camera);
+    let out = canvas;
+    if (transparent) {
+      out = trimToContent(canvas);
+      if (!out) throw new Error('Nothing visible to export');
+      // The size choice means the piece itself, so re-render big enough for the trimmed piece to hit it.
+      const k = state.exportSize / Math.max(out.width, out.height);
+      const cap = Math.min(8192, renderer.capabilities.maxTextureSize);
+      const s = Math.min(k, cap / Math.max(ew, eh));
+      if (s > 1.02) {
+        lockRenderSize(Math.round(ew * s) & ~1, Math.round(eh * s) & ~1);
+        renderer.render(scene, camera);
+        out = trimToContent(canvas);
+      }
+    }
+    const blob = await tagSRGB(await new Promise((r) => out.toBlob(r, 'image/png')));
+    if (!blob) throw new Error('empty');
+    const name = `${slug()}-${state.material}${transparent ? '' : '-scene'}.png`;
+    download(blob, name);
+    toast(`Saved ${name} (${out.width}×${out.height})`);
+  } catch (e) {
+    console.error(e);
+    toast(e.message === 'Nothing visible to export' ? 'Nothing is in frame to export.' : 'Export failed. Try 2K, or a smaller window.', true);
+  } finally {
+    scene.background = prevBg;
+    unlockRenderSize();
+    setExportBusy(btn, null); btn.textContent = 'Export PNG';
+  }
+}
+
+// Canvas PNGs carry no colour profile, so Preview, Canva and others each guess, and on wide-gamut
+// screens some guess darker. An sRGB chunk right after IHDR tells every app to read them as the
+// browser showed them.
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function tagSRGB(blob) {
+  if (!blob) return blob;
+  const src = new Uint8Array(await blob.arrayBuffer());
+  const ihdrEnd = 8 + 8 + 13 + 4; // signature, IHDR length+type, data, CRC
+  const chunk = new Uint8Array(13), dv = new DataView(chunk.buffer);
+  dv.setUint32(0, 1); chunk.set([0x73, 0x52, 0x47, 0x42], 4); chunk[8] = 0; // 'sRGB', perceptual intent
+  dv.setUint32(9, crc32(chunk.subarray(4, 9)));
+  const out = new Uint8Array(src.length + 13);
+  out.set(src.subarray(0, ihdrEnd)); out.set(chunk, ihdrEnd); out.set(src.subarray(ihdrEnd), ihdrEnd + 13);
+  return new Blob([out], { type: 'image/png' });
+}
+
+let rec = null;
+function pickVideoType() {
+  const types = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  return types.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+}
+// Preferred path: render each frame on purpose and hand it to the browser's H.264 encoder, then mux
+// to MP4 with the colour description (BT.709) the encoder reports. Every frame lands exactly on the
+// loop, nothing drops if the machine is busy, and players show the colours as the preview did.
+async function exportVideoExact(btn) {
+  const fps = 30, frames = Math.round(state.loop * fps);
+  const [ew, eh] = exportDims(1920);
+  // H.264 levels cap the frame size (4.0 tops out near 1080p), so try higher levels for tall frames.
+  let cfg = null;
+  for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.640033', 'avc1.4d0033', 'avc1.42e033']) {
+    const c = { codec, width: ew, height: eh, bitrate: 16_000_000, framerate: fps, avc: { format: 'avc' } };
+    try { if ((await VideoEncoder.isConfigSupported(c)).supported) { cfg = c; break; } } catch {}
+  }
+  if (!cfg) return false;
+  const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/+esm');
+  const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: ew, height: eh, frameRate: fps }, fastStart: 'in-memory' });
+  let failure = null;
+  const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failure = e; } });
+  enc.configure(cfg);
+  rec = { exact: true, cancelled: false };
+  setExportBusy(btn, 'Rendering… 0%'); btn.disabled = false;
+  lockRenderSize(ew, eh);
+  manualYaw = manualPitch = 0;
+  try {
+    for (let i = 0; i < frames && !rec.cancelled; i++) {
+      const ph = 2 * Math.PI * i / frames;
+      pose(ph, ph);
+      renderer.render(scene, camera);
+      const vf = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      enc.encode(vf, { keyFrame: i % 60 === 0 }); vf.close();
+      if (failure) throw failure;
+      if (i % 4 === 0) { btn.textContent = `Rendering… ${Math.round(i / frames * 100)}% · Cancel`; await new Promise((r) => setTimeout(r, 0)); }
+      while (enc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 4));
+    }
+    await enc.flush();
+    if (rec.cancelled) { toast('Video export cancelled'); return true; }
+    muxer.finalize();
+    const name = `${slug()}-${state.material}-loop.mp4`;
+    download(new Blob([muxer.target.buffer], { type: 'video/mp4' }), name);
+    toast(`Saved ${name} (${ew}×${eh}, ${state.loop}s loop)`);
+  } catch (e) {
+    console.error(e); toast('Video export failed. Try a shorter loop, or a smaller window.', true);
+  } finally {
+    try { enc.close(); } catch {}
+    rec = null; unlockRenderSize();
+    setExportBusy(btn, null); btn.textContent = 'Export video';
+  }
+  return true;
+}
+
+async function exportVideo() {
+  const btn = $('#videoBtn');
+  if (rec) { rec.cancelled = true; if (rec.recorder && rec.recorder.state !== 'inactive') rec.recorder.stop(); return; }
+  if (!field || !group.visible) { toast('Type some text first, then export.', true); return; }
+  if ('VideoEncoder' in window && 'VideoFrame' in window) {
+    try { if (await exportVideoExact(btn)) return; } catch (e) { console.warn('Exact export unavailable, recording instead', e); rec = null; }
+  }
+  const mime = pickVideoType();
+  if (!mime || !canvas.captureStream) { toast('This browser can’t record video. Try Chrome or Safari.', true); return; }
+  const [ew, eh] = exportDims(1920);
+  lockRenderSize(ew, eh);
+  manualYaw = manualPitch = 0;
+  const stream = canvas.captureStream(30);
+  const chunks = [];
+  const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 20_000_000 });
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((r) => recorder.onstop = r);
+  setExportBusy(btn, 'Recording… 0%');
+  btn.disabled = false;
+  rec = { t0: performance.now(), recorder, cancelled: false };
+  recorder.start(250);
+  await stopped;
+  const cancelled = rec.cancelled;
+  rec = null;
+  stream.getTracks().forEach((t) => t.stop());
+  unlockRenderSize();
+  setExportBusy(btn, null); btn.textContent = 'Export video';
+  if (cancelled) { toast('Recording cancelled'); return; }
+  const type = mime.split(';')[0];
+  const name = `${slug()}-${state.material}-loop.${type === 'video/mp4' ? 'mp4' : 'webm'}`;
+  download(new Blob(chunks, { type }), name);
+  toast(`Saved ${name} (${ew}×${eh}, ${state.loop}s loop)`);
+}
+
+/* ---------- Loop ---------- */
+let last = performance.now(), phase = 0, liqPhase = 0;
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (rec && !rec.exact) {
+    // Exactly one turn cycle so the clip loops seamlessly.
+    const t = (now - rec.t0) / 1000;
+    phase = 2 * Math.PI * Math.min(1, t / state.loop);
+    if (!rec.cancelled) $('#videoBtn').textContent = `Recording… ${Math.round(Math.min(1, t / state.loop) * 100)}% · Cancel`;
+    if (t >= state.loop + 0.08 && rec.recorder.state === 'recording') rec.recorder.stop();
+  } else if (state.turn) {
+    phase += dt * 2 * Math.PI / state.loop;
+    if (!dragging) { const k = Math.pow(0.15, dt); manualYaw *= k; manualPitch *= k; }
+  }
+  if (rec && rec.exact) { requestAnimationFrame(tick); return; } // the exporter is rendering frames itself
+  // Liquid keeps moving even when the turn is paused; while recording it follows the loop exactly.
+  if (rec) liqPhase = phase; else if (!reduced) liqPhase += dt * 2 * Math.PI / state.loop;
+  pose(phase, liqPhase);
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+function pose(ph, lph) {
+  LIQ_U.uPhase.value = lph;
+  LIQ_U.uFlow.value = state.material === 'liquid' ? state.liquid.flow : 0;
+  group.position.set(state.posX, state.posY, 0);
+  group.scale.setScalar(state.size);
+  key.target.position.copy(group.position); // light and shadow travel with the piece
+  const sc = shadowBase * state.size, sh = key.shadow.camera;
+  if (sh.right !== sc) { Object.assign(sh, { left: -sc, right: sc, top: sc, bottom: -sc }); sh.updateProjectionMatrix(); }
+  key.position.copy(lightDir(state.keyAz, state.keyEl)).multiplyScalar(8).add(group.position);
+  group.rotation.y = THREE.MathUtils.degToRad(state.turnAmt) * Math.sin(ph) + manualYaw;
+  group.rotation.x = THREE.MathUtils.degToRad(state.tiltAmt) * Math.cos(ph) + manualPitch;
+}
+
+/* ---------- Start ---------- */
+buildPanel();
+applyLights();
+resize();
+setBgColor(state.bgColor, state.bg);
+await ensureFont();
+try { await heavyBuild(); } catch (e) { console.error(e); toast('Couldn’t build that shape. Try different text.', true); }
+$('#boot').hidden = true;
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
