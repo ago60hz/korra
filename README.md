@@ -1,102 +1,55 @@
 # Korra
 
-Type a word, or drop in a logo, and Korra casts it as a heavy 3D relic: carved rock, cast metal, glass or liquid. Export a transparent PNG or a seamless looping video for Canva, websites, posters and video.
+Type a word, or drop in a logo, and Korra turns it into a heavy 3D relic: carved rock, cast metal, glass or liquid. Export a transparent PNG or a looping video for Canva, websites, posters and video.
 
-It is one HTML file and an agent skill, so Claude or Codex can open it for you and tell you which settings to use. Or just open the HTML yourself.
+## How to use it
 
-## Install in 30 seconds
-
-Pick **one**.
-
-### A. One line (Mac, Linux, Windows)
-
-Mac / Linux. Installs for Claude Code and/or Codex, whichever you have:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/ago60hz/korra/main/install.sh | sh
-```
-
-Windows (PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/ago60hz/korra/main/install.ps1 | iex
-```
-
-Then restart your agent.
-
-### B. Inside your agent
-
-**Claude Code**
+You don't install anything. Copy this link:
 
 ```
-/plugin marketplace add ago60hz/korra
-/plugin install korra@korra
+https://github.com/ago60hz/korra
 ```
 
-**Codex**: type this in a Codex session:
+Paste it into **Claude** or **Codex** and say what you want:
 
-```
-$skill-installer install https://github.com/ago60hz/korra/tree/main/skills/korra
-```
+> Use this skill to make "RELIC" in bronze.
 
-### C. Any other agent (Cursor, Gemini CLI, and so on)
+> Use this skill. I have a logo and I want it in chrome on a black background.
 
-```bash
-npx skills add ago60hz/korra
-```
+Your agent opens Korra in your browser and tells you which settings to use.
 
-### D. By hand
+**Want it ready every time?** Paste the link and say: *"Install this skill for me."* After that you can just say "Open Korra" and skip the link.
 
-Download this repo, then copy the `skills/korra` folder to:
-
-| Agent | Folder |
-| --- | --- |
-| Claude Code | `~/.claude/skills/korra` |
-| Codex | `~/.codex/skills/korra` |
-
-No agent at all? Skip the install and open [`skills/korra/Korra.html`](skills/korra/Korra.html) in your browser.
-
-## Use it
-
-Ask your agent in plain words:
-
-> Open Korra and make my logo in bronze, then tell me how to export it for Canva.
->
-> Make "RELIC" look like carved sandstone.
->
-> I need a chrome wordmark on a black background, 4K.
-
-The agent starts Korra on your machine, opens your browser, and walks you through the settings. To launch it yourself:
-
-```bash
-python3 skills/korra/scripts/serve.py      # Windows: py skills/korra/scripts/serve.py
-```
-
-## Quick tutorial
+## Make something in 7 steps
 
 1. **Source.** Type a short word (one or two lines), or switch to **SVG or PNG** for a logo. Black becomes the form.
-2. **Material.** Choose Rock, Metal, Glass or Liquid, then a finish swatch (Sandstone, Chrome, Bronze, Mercury and more).
+2. **Material.** Choose Rock, Metal, Glass or Liquid, then a finish (Sandstone, Chrome, Bronze, Mercury and more).
 3. **Shape.** Bevel sets how rounded the edges are. Low looks cast, high looks puffy.
 4. **Light.** Move the light direction and height until the edges catch.
-5. **Scene.** White, Black, a colour, or **Upload design** to test on your poster. Glass and liquid refract what is behind them.
+5. **Scene.** White, Black, a colour, or **Upload design** to see it on your poster. Glass and liquid show what is behind them.
 6. **Pose.** Drag to move, Shift-drag to turn, scroll to resize.
-7. **Export.** Transparent PNG (2K or 4K) for design tools, "With scene" for a finished image, or **Export video** for a seamless loop.
+7. **Export.** **Export PNG** (transparent, 2K or 4K) for Canva and design tools, "With scene" for a finished image, or **Export video** for a looping clip.
 
-Every control is covered in [`skills/korra/references/controls.md`](skills/korra/references/controls.md), with a few starting recipes.
+Every control is explained in [`skills/korra/references/controls.md`](skills/korra/references/controls.md), with a few starting recipes.
 
 ## Good to know
 
-- Needs internet on first load (Three.js and Google Fonts load from a CDN). Nothing you make leaves your machine.
-- Use Chrome or Edge for video export. PNG export works in any browser.
-- 4K export is heavy on older GPUs. Preview at 2K first.
+- You need internet the first time it loads. Nothing you make leaves your computer.
+- Use Chrome or Edge to export video. PNG export works in any browser.
+- 4K export is slow on older computers. Try 2K first.
 
-## Update or remove
+## No agent? Open it yourself
 
-Run the same install command again to update. To remove:
+Download [`Korra.html`](skills/korra/Korra.html) and open it in Chrome. If it stays on "Loading the 3D engine…", ask Claude or Codex to open it for you.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ago60hz/korra/main/install.sh | sh -s -- --uninstall --all
-```
+## For agents
+
+If a user gives you this repo's link:
+
+1. Read `skills/korra/SKILL.md` and follow it. It says how to open and run Korra.
+2. To use it once, get the repo (clone it, or download `https://github.com/ago60hz/korra/archive/refs/heads/main.tar.gz`) into a temporary folder and run `python3 skills/korra/scripts/serve.py` from it.
+3. If the user asks to install it, run `sh install.sh` from the repo. It copies `skills/korra` into `~/.claude/skills/korra` and/or `~/.codex/skills/korra` for whichever you are. On Windows, copy that folder to the same place by hand. To remove it, delete that folder (or run `sh install.sh --uninstall --all`).
+4. Tell the user to restart their agent after installing.
 
 ## What's in the repo
 
@@ -106,9 +59,8 @@ skills/korra/
   Korra.html            the whole tool, one file
   scripts/serve.py      opens it on localhost
   references/controls.md
-install.sh / install.ps1
-.claude-plugin/         Claude Code plugin and marketplace
-AGENTS.md               pointer for other agents
+install.sh              optional: copies the skill into Claude Code / Codex
+AGENTS.md               pointer for agents
 ```
 
 ## Licence
